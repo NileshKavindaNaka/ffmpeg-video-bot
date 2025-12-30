@@ -195,9 +195,33 @@ async def get_video_info(file_path: str) -> Dict[str, Any]:
     
     return result
 
-
+def format_media_info(info: Dict[str, Any]) -> str:
+    """Format media info for display"""
+    if not info:
+        return "Unknown format"
+        
+    text = f"<b>📄 File:</b> <code>{info.get('filename')}</code>\n"
+    text += f"<b>⏱ Duration:</b> <code>{int(info.get('duration', 0))}s</code>\n"
+    text += f"<b>💾 Size:</b> <code>{info.get('size', 0) / (1024*1024):.1f} MB</code>\n"
+    
+    if 'video' in info:
+        v = info['video']
+        text += f"\n<b>📹 Video:</b>\n"
+        text += f"• Codec: <code>{v.get('codec')}</code>\n"
+        text += f"• Resolution: <code>{v.get('width')}x{v.get('height')}</code>\n"
+        text += f"• Bitrate: <code>{v.get('bitrate', 0) // 1000} kbps</code>\n"
+    
+    if 'audio' in info:
+        text += f"\n<b>🔊 Audio:</b>\n"
+        for i, a in enumerate(info['audio'], 1):
+            text += f"• Track {i}: <code>{a.get('codec')}</code> ({a.get('language')})\n"
+            
+    if 'subtitles' in info:
+        text += f"\n<b>💬 Subtitles:</b>\n"
+        for i, s in enumerate(info['subtitles'], 1):
+            text += f"• Track {i}: <code>{s.get('codec')}</code> ({s.get('language')})\n"
+            
     return text
-
 
 async def run_ffmpeg_command(
     cmd: list,
