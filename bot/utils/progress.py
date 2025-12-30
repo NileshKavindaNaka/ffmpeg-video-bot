@@ -162,15 +162,12 @@ class FFmpegProgress:
             f"{header}"
             f"┃ {progress_bar} {percentage:.1f}%\n"
             f"├ <b>Status:</b> {op_name}\n"
-            f"├ <b>Time:</b> {self._format_time(current_time)} / {self._format_time(self.duration)}\n"
-            f"├ <b>Elapsed:</b> {self._format_time(elapsed)}\n"
-            f"└ <b>ETA:</b> {self._format_time(eta)}"
+            f"├ <b>Time:</b> {Progress._format_time(current_time)} / {Progress._format_time(self.duration)}\n"
+            f"├ <b>Elapsed:</b> {Progress._format_time(elapsed)}\n"
+            f"└ <b>ETA:</b> {Progress._format_time(eta)}"
         )
         
         try:
             await self.message.edit_text(text)
         except Exception as e:
             LOGGER.debug(f"FFmpeg progress update error: {e}")
-    
-    # Helper method re-used from Progress
-    _format_time = Progress._format_time
