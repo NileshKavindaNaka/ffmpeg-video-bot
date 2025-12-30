@@ -61,6 +61,7 @@ class Progress:
         
         header = f"<b>{self.filename}</b>\n" if self.filename else ""
         
+        text = (
             f"{header}"
             f"┃ {progress_bar} {percentage:.1f}%\n"
             f"├ <b>Processed:</b> {self._format_size(current)} of {self._format_size(total)}\n"
