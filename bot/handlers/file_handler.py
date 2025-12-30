@@ -22,22 +22,60 @@ def is_authorized(user_id: int) -> bool:
 
 @bot.on_message(filters.private & (filters.video | filters.document))
 async def handle_video(client: Client, message: Message):
-    """Handle received video files"""
+    """Handle received video files and subtitles"""
     user = message.from_user
     
     if not is_authorized(user.id):
         await message.reply_text("❌ You are not authorized.")
         return
     
-    # Check if we are waiting for a second video (Vid+Vid)
-    if user.id in user_data and user_data[user.id].get('waiting_for') == 'second_video':
+    # helper to check subtitle
+    def is_subtitle_file(filename: str) -> bool:
+        if not filename: return False
+        return any(filename.lower().endswith(ext) for ext in ['.srt', '.ass', '.ssa', '.vtt', '.sub'])
+
+    fname = message.document.file_name if message.document else (message.video.file_name if message.video else "")
+    
+    # Get current state
+    waiting_for = user_data.get(user.id, {}).get('waiting_for')
+    
+    # 1. Check if waiting for Subtitles
+    if waiting_for in ['subtitle', 'hardsub']:
+        if message.document and is_subtitle_file(fname):
+            user_data[user.id]['subtitle_message'] = message
+            user_data[user.id]['subtitle_name'] = fname
+            
+            # Determine operation
+            operation = 'add_subtitle' if waiting_for == 'subtitle' else 'hardsub'
+            user_data[user.id]['waiting_for'] = None
+            
+            await message.reply_text(
+                "✅ Subtitle file received!\n\n"
+                "Processing will begin shortly...",
+                quote=True
+            )
+            
+            from bot.handlers.message_handler import MockQuery
+            from bot.handlers.callbacks import process_video
+            await process_video(client, MockQuery(message, user), operation, {})
+            return
+        else:
+            await message.reply_text("❌ Please send a valid subtitle file (.srt, .ass, .ssa, .vtt).")
+            return
+
+    # 2. Check if waiting for Second Video (Vid+Vid)
+    if waiting_for == 'second_video':
         # Check if it's a video
-        if message.document and not is_video_file(message.document.file_name):
+        is_video = False
+        if message.video: is_video = True
+        if message.document and is_video_file(fname): is_video = True
+        
+        if not is_video:
             await message.reply_text("❌ Please send a valid video file.")
             return
 
         user_data[user.id]['second_video_message'] = message
-        user_data[user.id]['second_video_name'] = message.video.file_name if message.video else message.document.file_name
+        user_data[user.id]['second_video_name'] = fname
         user_data[user.id]['waiting_for'] = None
         
         from bot.handlers.message_handler import MockQuery
@@ -47,42 +85,51 @@ async def handle_video(client: Client, message: Message):
         await process_video(client, MockQuery(message, user), 'merge_video', {})
         return
 
-    # Normal new video handling
-    # Check if it's a video
-    if message.document:
-        file_name = message.document.file_name
-        file_size = message.document.file_size
-        if not is_video_file(file_name):
-            await message.reply_text(
-                "❌ Please send a video file.\n\n"
-                "Supported formats: mp4, mkv, avi, mov, webm, flv, etc."
-            )
-            return
-    else:
-        file_name = message.video.file_name or f"video_{message.video.file_unique_id}.mp4"
-        file_size = message.video.file_size
+    # 3. Check if it's a new Video
+    is_video = False
+    if message.video: is_video = True
+    if message.document and is_video_file(fname): is_video = True
     
-    # Store file info for this user
-    user_data[user.id] = {
-        'message_id': message.id,
-        'file_name': file_name,
-        'file_size': file_size,
-        'file_path': None,
-        'operation': None,
-        'settings': user_data.get(user.id, {}).get('settings', {}),
-    }
-    
-    info_text = (
-        f"<b>📁 File Received!</b>\n\n"
-        f"<b>📄 Name:</b> <code>{file_name}</code>\n"
-        f"<b>💾 Size:</b> {get_readable_file_size(file_size)}\n\n"
-        f"<b>Select an operation from the menu below:</b>"
-    )
-    
+    if is_video:
+        file_name = fname or f"video_{message.video.file_unique_id}.mp4"
+        file_size = message.document.file_size if message.document else message.video.file_size
+        
+        # Store file info for this user
+        user_data[user.id] = {
+            'message_id': message.id,
+            'file_name': file_name,
+            'file_size': file_size,
+            'file_path': None,
+            'operation': None,
+            'settings': user_data.get(user.id, {}).get('settings', {}),
+        }
+        
+        info_text = (
+            f"<b>📁 File Received!</b>\n\n"
+            f"<b>📄 Name:</b> <code>{file_name}</code>\n"
+            f"<b>💾 Size:</b> {get_readable_file_size(file_size)}\n\n"
+            f"<b>Select an operation from the menu below:</b>"
+        )
+        
+        await message.reply_text(
+            info_text,
+            reply_markup=main_menu(user.id),
+            quote=True
+        )
+        return
+
+    # 4. Check if random Subtitle (not waiting)
+    if message.document and is_subtitle_file(fname):
+        await message.reply_text(
+            "ℹ️ To add subtitles, please send a video first, then select <b>Vid+Sub</b> from the menu.",
+            quote=True
+        )
+        return
+
+    # 5. Unknown/Invalid
     await message.reply_text(
-        info_text,
-        reply_markup=main_menu(user.id),
-        quote=True
+        "❌ Please send a video file.\n\n"
+        "Supported formats: mp4, mkv, avi, mov, webm, flv, etc."
     )
 
 
@@ -117,39 +164,7 @@ async def handle_audio(client: Client, message: Message):
         )
 
 
-@bot.on_message(filters.private & (filters.document))
-async def handle_subtitle(client: Client, message: Message):
-    """Handle subtitle files (for Vid+Sub and Hardsub)"""
-    user = message.from_user
-    
-    if not is_authorized(user.id):
-        return
-    
-    if not message.document:
-        return
-    
-    file_name = message.document.file_name.lower()
-    subtitle_exts = ['.srt', '.ass', '.ssa', '.vtt', '.sub']
-    
-    if any(file_name.endswith(ext) for ext in subtitle_exts):
-        waiting_for = user_data.get(user.id, {}).get('waiting_for')
-        if waiting_for in ['subtitle', 'hardsub']:
-            user_data[user.id]['subtitle_message'] = message
-            user_data[user.id]['subtitle_name'] = message.document.file_name
-            
-            # Determine operation
-            operation = 'add_subtitle' if waiting_for == 'subtitle' else 'hardsub'
-            user_data[user.id]['waiting_for'] = None
-            
-            await message.reply_text(
-                "✅ Subtitle file received!\n\n"
-                "Processing will begin shortly...",
-                quote=True
-            )
-            
-            from bot.handlers.message_handler import MockQuery
-            from bot.handlers.callbacks import process_video
-            await process_video(client, MockQuery(message, user), operation, {})
+
 
 
 @bot.on_message(filters.private & filters.photo)
