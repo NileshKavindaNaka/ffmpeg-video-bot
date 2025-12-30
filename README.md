@@ -23,6 +23,8 @@ A powerful Telegram bot for video processing using FFmpeg. Deploy on your VPS fo
 | **Trim** | Cut video segments |
 
 ### ⚡ Extra Features
+- **Real-time Progress Tracking**: Detailed list-style progress bars for all operations
+- **Clean UI**: Minimalist, emoji-free interface for better readability
 - Video speed change (0.25x - 4x)
 - Video rotation and flip
 - Resolution change
@@ -60,6 +62,11 @@ OWNER_ID=your_telegram_id
 API_ID=your_api_id
 API_HASH=your_api_hash
 MONGO_URI=mongodb://mongodb:27017
+
+# Limits
+MAX_FILE_SIZE=2000
+TG_MAX_FILE_SIZE=2000
+MAX_DURATION=7200
 
 # Google Drive (optional)
 GDRIVE_ENABLED=True
@@ -112,7 +119,10 @@ python3 -m bot
 | `API_HASH` | ✅ | Telegram API Hash from my.telegram.org |
 | `MONGO_URI` | ❌ | MongoDB connection string |
 | `AUTHORIZED_USERS` | ❌ | Comma-separated user IDs (empty = public) |
-| `MAX_FILE_SIZE` | ❌ | Maximum file size in MB (default: 2000) |
+| `MAX_FILE_SIZE` | ❌ | Maximum download size in MB (default: 2000) |
+| `TG_MAX_FILE_SIZE` | ❌ | Max file size for TG upload (default: 2000) |
+| `MAX_DURATION` | ❌ | Max video duration in seconds (default: 7200) |
+| `DEFAULT_AUDIO_BITRATE`| ❌ | Audio bitrate for encoding (default: 192k) |
 | `GDRIVE_ENABLED` | ❌ | Enable Google Drive upload (True/False) |
 | `GDRIVE_CREDENTIALS` | ❌ | Path to credentials.json |
 | `GDRIVE_FOLDER_ID` | ❌ | Google Drive folder ID for uploads |
