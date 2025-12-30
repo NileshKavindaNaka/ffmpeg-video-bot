@@ -224,8 +224,25 @@ async def download_file(message: Message, status_msg: Message, user_id: int = No
     return file_path
 
 
-async def upload_file(client: Client, chat_id: int, file_path: str, status_msg: Message, caption: str = None, user_id: int = None):
+async def upload_file(client: Client, chat_id: int, file_path: str | list, status_msg: Message, caption: str = None, user_id: int = None):
     """Upload file with progress"""
+    
+    # Handle list of files (Media Group)
+    if isinstance(file_path, list):
+        from pyrogram.types import InputMediaPhoto
+        media = []
+        for f in file_path:
+            # Assume photos for now (screenshots)
+            media.append(InputMediaPhoto(f))
+        
+        await status_msg.edit_text("📤 Uploading album...")
+        try:
+            await client.send_media_group(chat_id, media)
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Upload failed: {e}")
+            raise e
+        return
+
     progress = Progress(status_msg, "📤 Uploading", user_id=user_id)
     
     # Store progress for cancellation

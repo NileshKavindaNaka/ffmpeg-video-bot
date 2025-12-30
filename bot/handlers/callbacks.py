@@ -1220,33 +1220,15 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         
         elif operation == 'extract_screenshots':
             count = int(options.get('count', 5))
-            # Pattern for ffmpeg
-            output_pattern = os.path.join(output_dir, f"{base_name}_ss_%03d.jpg")
-            # Actual list logic handles %d or %03d?
-            # extract_screenshots in extract.py takes output_dir and joins filename.
-            # wait, extract_screenshots signature: (input, output_dir, count)
-            # It generates filenames internally: screenshot_{i:02d}.jpg
             
-            # Correct usage: pass output_dir, not pattern
-            # But process_video defines output_dir. 
-            # I should pass a specific sub-folder to avoid clutter?
+            # Use specific dir to avoid clutter
             ss_dir = os.path.join(output_dir, f"screenshots_{user_id}")
             success, result = await extract_screenshots(input_path, ss_dir, count=count)
             
             if success:
                 # result is list of paths
-                # Zip them
-                import zipfile
-                zip_path = os.path.join(output_dir, f"{base_name}_screenshots.zip")
-                with zipfile.ZipFile(zip_path, 'w') as zf:
-                    for f in result:
-                        zf.write(f, os.path.basename(f))
-                        os.remove(f) # Clean up individual files
-                try:
-                    os.rmdir(ss_dir)
-                except:
-                    pass
-                output_path = zip_path
+                # Return list directly for Media Group upload
+                output_path = result
             else:
                 error = "Failed to extract screenshots"
 
@@ -1460,7 +1442,13 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
             return
         
         # Check file size
-        file_size = os.path.getsize(output_path)
+        if isinstance(output_path, list):
+            file_size = sum(os.path.getsize(f) for f in output_path)
+            display_name = f"Screenshots ({len(output_path)} photos)"
+        else:
+            file_size = os.path.getsize(output_path)
+            display_name = f"<code>{os.path.basename(output_path)}</code>"
+            
         file_size_mb = file_size / (1024 * 1024)
         
         # Store output path for later upload
@@ -1468,25 +1456,29 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         user_data[user_id]['output_size'] = file_size
         
         # If file is larger than 2GB, show upload options
+        # For list, we might rely on Telegram limits, but usually screenshots are small
         if file_size_mb >= 2000:
-            await status_msg.edit_text(
+            msg_text = (
                 f"<b>✅ Processing Complete!</b>\n\n"
-                f"<b>📁 File:</b> <code>{os.path.basename(output_path)}</code>\n"
+                f"<b>📁 File:</b> {display_name}\n"
                 f"<b>💾 Size:</b> {get_readable_file_size(file_size)}\n\n"
-                f"<b>⚠️ File is larger than 2GB!</b>\n"
+                f"<b>⚠️ Total size > 2GB!</b>\n"
                 f"Cannot upload to Telegram directly.\n\n"
-                f"Choose upload destination:",
-                reply_markup=after_process_menu(user_id, file_size_mb, GDRIVE_ENABLED)
+                f"Choose upload destination:"
             )
         else:
             # Show upload options for smaller files too
-            await status_msg.edit_text(
+            msg_text = (
                 f"<b>✅ Processing Complete!</b>\n\n"
-                f"<b>📁 File:</b> <code>{os.path.basename(output_path)}</code>\n"
+                f"<b>📁 File:</b> {display_name}\n"
                 f"<b>💾 Size:</b> {get_readable_file_size(file_size)}\n\n"
-                f"Choose upload destination:",
-                reply_markup=after_process_menu(user_id, file_size_mb, GDRIVE_ENABLED)
+                f"Choose upload destination:"
             )
+            
+        await status_msg.edit_text(
+            msg_text,
+            reply_markup=after_process_menu(user_id, file_size_mb, GDRIVE_ENABLED)
+        )
         
         # Cleanup input file
         try:
@@ -1515,13 +1507,20 @@ async def upload_telegram_callback(client: Client, query: CallbackQuery):
     
     output_path = user_data[user_id]['output_path']
     
-    if not os.path.exists(output_path):
-        await query.answer("File not found!", show_alert=True)
-        return
+    # Verify files
+    if isinstance(output_path, list):
+        if not all(os.path.exists(f) for f in output_path):
+            await query.answer("Some files not found!", show_alert=True)
+            return
+        total_size = sum(os.path.getsize(f) for f in output_path)
+    else:
+        if not os.path.exists(output_path):
+            await query.answer("File not found!", show_alert=True)
+            return
+        total_size = os.path.getsize(output_path)
     
-    file_size = os.path.getsize(output_path)
-    if file_size >= 2000 * 1024 * 1024:
-        await query.answer("File too large for Telegram (>2GB)!", show_alert=True)
+    if total_size >= 2000 * 1024 * 1024:
+        await query.answer("Total size too large for Telegram (>2GB)!", show_alert=True)
         return
     
     await query.answer("Uploading to Telegram...")
@@ -1533,7 +1532,17 @@ async def upload_telegram_callback(client: Client, query: CallbackQuery):
         
         # Cleanup
         try:
-            os.remove(output_path)
+            if isinstance(output_path, list):
+                for f in output_path: 
+                    os.remove(f)
+                # Try to remove the screenshots directory
+                if output_path:
+                    try:
+                        os.rmdir(os.path.dirname(output_path[0]))
+                    except:
+                        pass
+            else:
+                os.remove(output_path)
             del user_data[user_id]['output_path']
         except:
             pass
@@ -1559,8 +1568,32 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
         return
     
     output_path = user_data[user_id]['output_path']
+    real_upload_path = output_path
+    is_zip = False
     
-    if not os.path.exists(output_path):
+    # Handle list (Screenshots) -> Zip for GDrive
+    if isinstance(output_path, list):
+        if not output_path or not os.path.exists(output_path[0]):
+             await query.answer("Files not found!", show_alert=True)
+             return
+             
+        try:
+            import zipfile
+            dir_path = os.path.dirname(output_path[0])
+            zip_path = os.path.join(dir_path, "screenshots.zip")
+            
+            with zipfile.ZipFile(zip_path, 'w') as zf:
+                for f in output_path:
+                     if os.path.exists(f):
+                        zf.write(f, os.path.basename(f))
+            
+            real_upload_path = zip_path
+            is_zip = True
+        except Exception as e:
+            await query.answer(f"Zip failed: {e}", show_alert=True)
+            return
+
+    if not os.path.exists(real_upload_path):
         await query.answer("File not found!", show_alert=True)
         return
     
@@ -1592,7 +1625,7 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
                 pass
         
         success, result = await gdrive.upload_file(
-            output_path,
+            real_upload_path,
             folder_id=GDRIVE_FOLDER_ID if GDRIVE_FOLDER_ID else None,
             progress_callback=progress_callback
         )
@@ -1608,7 +1641,17 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
             
             # Cleanup
             try:
-                os.remove(output_path)
+                if is_zip:
+                    os.remove(real_upload_path) # remove zip
+                    for f in output_path: # remove originals
+                        os.remove(f)
+                    try:
+                        os.rmdir(os.path.dirname(output_path[0]))
+                    except:
+                        pass
+                else:
+                    os.remove(output_path)
+                
                 del user_data[user_id]['output_path']
             except:
                 pass
@@ -1631,8 +1674,18 @@ async def cancel_upload_callback(client: Client, query: CallbackQuery):
     
     # Cleanup
     if user_id in user_data and 'output_path' in user_data[user_id]:
+        path_var = user_data[user_id]['output_path']
         try:
-            os.remove(user_data[user_id]['output_path'])
+            if isinstance(path_var, list):
+                for f in path_var: 
+                    try: os.remove(f)
+                    except: pass
+                # Clean dir
+                if path_var:
+                    try: os.rmdir(os.path.dirname(path_var[0]))
+                    except: pass
+            else:
+                os.remove(path_var)
             del user_data[user_id]['output_path']
         except:
             pass
