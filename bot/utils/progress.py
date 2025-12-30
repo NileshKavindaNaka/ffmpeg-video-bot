@@ -61,13 +61,14 @@ class Progress:
         
         header = f"<b>{self.filename}</b>\n" if self.filename else ""
         
-        text = (
             f"{header}"
             f"┃ {progress_bar} {percentage:.1f}%\n"
             f"├ <b>Processed:</b> {self._format_size(current)} of {self._format_size(total)}\n"
-            f"├ <b>Status:</b> {op_name} | <b>ETA:</b> {self._format_time(eta)}\n"
-            f"├ <b>Speed:</b> {self._format_size(speed)}/s | <b>Elapsed:</b> {self._format_time(elapsed_time)}\n"
-            f"├ <b>User ID:</b> {self.user_id or 'Unknown'}"
+            f"├ <b>Status:</b> {op_name}\n"
+            f"├ <b>Speed:</b> {self._format_size(speed)}/s\n"
+            f"├ <b>Elapsed:</b> {self._format_time(elapsed_time)}\n"
+            f"├ <b>ETA:</b> {self._format_time(eta)}\n"
+            f"└ <b>User ID:</b> {self.user_id or 'Unknown'}"
         )
         
         # Add cancel button (No Emoji)
@@ -163,7 +164,7 @@ class FFmpegProgress:
             f"├ <b>Status:</b> {op_name}\n"
             f"├ <b>Time:</b> {self._format_time(current_time)} / {self._format_time(self.duration)}\n"
             f"├ <b>Elapsed:</b> {self._format_time(elapsed)}\n"
-            f"├ <b>ETA:</b> {self._format_time(eta)}"
+            f"└ <b>ETA:</b> {self._format_time(eta)}"
         )
         
         try:
