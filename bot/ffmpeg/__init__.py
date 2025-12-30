@@ -14,3 +14,4 @@ from bot.ffmpeg.effects import (
 )
 from bot.ffmpeg.trim import trim_video, trim_video_accurate, split_video
 from bot.ffmpeg.metadata import edit_metadata, clear_metadata, add_cover_image
+from bot.ffmpeg.custom import execute_custom_command

@@ -29,6 +29,25 @@ async def handle_video(client: Client, message: Message):
         await message.reply_text("❌ You are not authorized.")
         return
     
+    # Check if we are waiting for a second video (Vid+Vid)
+    if user.id in user_data and user_data[user.id].get('waiting_for') == 'second_video':
+        # Check if it's a video
+        if message.document and not is_video_file(message.document.file_name):
+            await message.reply_text("❌ Please send a valid video file.")
+            return
+
+        user_data[user.id]['second_video_message'] = message
+        user_data[user.id]['second_video_name'] = message.video.file_name if message.video else message.document.file_name
+        user_data[user.id]['waiting_for'] = None
+        
+        from bot.handlers.message_handler import MockQuery
+        from bot.handlers.callbacks import process_video
+        
+        await message.reply_text("✅ Second video received! Merging...", quote=True)
+        await process_video(client, MockQuery(message, user), 'merge_video', {})
+        return
+
+    # Normal new video handling
     # Check if it's a video
     if message.document:
         file_name = message.document.file_name
@@ -79,13 +98,18 @@ async def handle_audio(client: Client, message: Message):
     if user.id in user_data and user_data[user.id].get('waiting_for') == 'audio':
         user_data[user.id]['audio_message'] = message
         user_data[user.id]['audio_name'] = message.audio.file_name if message.audio else "audio.mp3"
+        user_data[user.id]['waiting_for'] = None
         
         await message.reply_text(
             "✅ Audio file received!\n\n"
             "Processing will begin shortly...",
             quote=True
         )
-        # Trigger processing (callback handler will handle this)
+        
+        from bot.handlers.message_handler import MockQuery
+        from bot.handlers.callbacks import process_video
+        await process_video(client, MockQuery(message, user), 'add_audio', {})
+        
     else:
         await message.reply_text(
             "ℹ️ Send a video first, then select <b>Vid+Aud</b> to add this audio.",
@@ -108,15 +132,24 @@ async def handle_subtitle(client: Client, message: Message):
     subtitle_exts = ['.srt', '.ass', '.ssa', '.vtt', '.sub']
     
     if any(file_name.endswith(ext) for ext in subtitle_exts):
-        if user.id in user_data and user_data[user.id].get('waiting_for') in ['subtitle', 'hardsub']:
+        waiting_for = user_data.get(user.id, {}).get('waiting_for')
+        if waiting_for in ['subtitle', 'hardsub']:
             user_data[user.id]['subtitle_message'] = message
             user_data[user.id]['subtitle_name'] = message.document.file_name
+            
+            # Determine operation
+            operation = 'add_subtitle' if waiting_for == 'subtitle' else 'hardsub'
+            user_data[user.id]['waiting_for'] = None
             
             await message.reply_text(
                 "✅ Subtitle file received!\n\n"
                 "Processing will begin shortly...",
                 quote=True
             )
+            
+            from bot.handlers.message_handler import MockQuery
+            from bot.handlers.callbacks import process_video
+            await process_video(client, MockQuery(message, user), operation, {})
 
 
 @bot.on_message(filters.private & filters.photo)
@@ -129,11 +162,24 @@ async def handle_photo(client: Client, message: Message):
     
     if user.id in user_data and user_data[user.id].get('waiting_for') == 'watermark_image':
         user_data[user.id]['watermark_message'] = message
+        user_data[user.id]['waiting_for'] = None
         
         await message.reply_text(
             "✅ Watermark image received!\n\n"
-            "Processing will begin shortly...",
+            "Now configure position, opacity, etc.",
             quote=True
+        )
+        # Note: We don't verify 'watermark' operation here because we still need to apply settings.
+        # We just go back to watermark menu (or show it).
+        # But we need to update settings to say we have an image.
+        if 'watermark_settings' not in user_data[user.id]:
+            user_data[user.id]['watermark_settings'] = {}
+        # We don't save path yet, we download on apply.
+        
+        from bot.keyboards.menus import watermark_menu
+        await message.reply_text(
+            "Image saved. Configure settings:",
+            reply_markup=watermark_menu(user.id)
         )
 
 

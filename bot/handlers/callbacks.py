@@ -60,8 +60,94 @@ async def cancel_process_callback(client: Client, query: CallbackQuery):
                 pass
 
 
-@bot.on_callback_query(filters.regex(r"^main_"))
-async def main_menu_callback(client: Client, query: CallbackQuery):
+@bot.on_callback_query(filters.regex(r"^ffcmd_"))
+async def ffcmd_callback(client: Client, query: CallbackQuery):
+    """Handle FFMPEG CMD"""
+    user_id = int(query.data.split("_")[1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['operation'] = 'ffmpeg_cmd'
+    user_data[user_id]['waiting_for'] = 'ffmpeg_cmd'
+    
+    await query.message.edit_text(
+        "<b>🎬 FFMPEG CMD</b>\n\n"
+        "Send me the FFmpeg arguments.\n"
+        "Example: <code>-c:v libx265 -crf 28 -c:a aac -b:a 128k</code>\n\n"
+        "Input file is automatically handled.",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^vidvid_"))
+async def vidvid_callback(client: Client, query: CallbackQuery):
+    """Handle Vid+Vid"""
+    user_id = int(query.data.split("_")[1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['operation'] = 'merge_video'
+    user_data[user_id]['waiting_for'] = 'second_video'
+    
+    await query.message.edit_text(
+        "<b>🎥 Vid+Vid (Merge)</b>\n\n"
+        "Send me the second video to merge with.",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^streamswap_"))
+async def streamswap_callback(client: Client, query: CallbackQuery):
+    """Handle StreamSwap"""
+    user_id = int(query.data.split("_")[1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.message.edit_text(
+        "<b>🔄 StreamSwap</b>\n\n"
+        "Swapping video and audio streams via map...\n"
+        "This is an automated 1-click operation.",
+        reply_markup=confirm_menu(user_id, 'streamswap')
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^subintro_"))
+async def subintro_callback(client: Client, query: CallbackQuery):
+    """Handle Sub Intro"""
+    user_id = int(query.data.split("_")[1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['operation'] = 'sub_intro'
+    user_data[user_id]['waiting_for'] = 'sub_intro_text'
+    
+    await query.message.edit_text(
+        "<b>📜 Sub Intro</b>\n\n"
+        "Send me the text to show as intro (5 seconds).\n"
+        "It will be burned as subtitles.",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^back_"))
+async def back_callback(client: Client, query: CallbackQuery):
+    """Handle Back button"""
+    # For main menu back, we just close or show nothing?
+    # Or maybe it was intended for something else.
+    # Let's map it to close for now or main menu reload.
+    await close_callback(client, query)
     """Return to main menu"""
     user_id = int(query.data.split("_")[1])
     
@@ -141,6 +227,205 @@ async def preset_callback(client: Client, query: CallbackQuery):
         reply_markup=preset_menu(user_id)
     )
     await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_crf_"))
+async def crf_callback(client: Client, query: CallbackQuery):
+    """Set CRF value"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = 'enc_crf'
+    
+    await query.message.edit_text(
+        "<b>🎯 Set CRF Value</b>\n\n"
+        "Send a value between 0-51.\n"
+        "Lower = Better Quality (Larger size)\n"
+        "Higher = Lower Quality (Smaller size)\n"
+        "Default: 23 (libx264), 28 (libx265)",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_vcodec_"))
+async def vcodec_callback(client: Client, query: CallbackQuery):
+    """Set video codec"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = 'enc_vcodec'
+    
+    await query.message.edit_text(
+        "<b>🎬 Set Video Codec</b>\n\n"
+        "Send the codec name.\n"
+        "Examples: <code>libx264</code>, <code>libx265</code>, <code>vp9</code>, <code>copy</code>",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_acodec_"))
+async def acodec_callback(client: Client, query: CallbackQuery):
+    """Set audio codec"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = 'enc_acodec'
+    
+    await query.message.edit_text(
+        "<b>🔊 Set Audio Codec</b>\n\n"
+        "Send the codec name.\n"
+        "Examples: <code>aac</code>, <code>libmp3lame</code>, <code>libopus</code>, <code>copy</code>",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_fps_"))
+async def fps_callback(client: Client, query: CallbackQuery):
+    """Set FPS"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = 'enc_fps'
+    
+    await query.message.edit_text(
+        "<b>🖼️ Set FPS</b>\n\n"
+        "Send the target FPS (frames per second).\n"
+        "Examples: <code>30</code>, <code>60</code>, <code>24</code>",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_start_"))
+async def encode_start_callback(client: Client, query: CallbackQuery):
+    """Start encoding"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.answer("Starting encoding...")
+    
+    settings = user_data[user_id].get('settings', {})
+    await process_video(client, query, 'encode', settings)
+
+
+@bot.on_callback_query(filters.regex(r"^wm_pos_"))
+async def wm_pos_callback(client: Client, query: CallbackQuery):
+    """Show watermark position menu"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.message.edit_text(
+        "<b>📍 Select Watermark Position</b>",
+        reply_markup=watermark_position_menu(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^wmpos_"))
+async def set_wm_pos_callback(client: Client, query: CallbackQuery):
+    """Set watermark position"""
+    parts = query.data.split("_")
+    pos = f"{parts[1]}_{parts[2]}" if len(parts) > 3 else parts[1] # handle top_left etc.
+    user_id = int(parts[-1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    if 'watermark_settings' not in user_data[user_id]:
+        user_data[user_id]['watermark_settings'] = {}
+        
+    user_data[user_id]['watermark_settings']['position'] = pos
+    await query.answer(f"Position set to: {pos}")
+    
+    # Return to watermark menu
+    await watermark_callback(client, query)
+
+
+@bot.on_callback_query(filters.regex(r"^wm_opacity_"))
+async def wm_opacity_callback(client: Client, query: CallbackQuery):
+    """Set watermark opacity"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = 'wm_opacity'
+    
+    await query.message.edit_text(
+        "<b>🔍 Set Opacity</b>\n\n"
+        "Send a value between 0.1 and 1.0.\n"
+        "Example: 0.5 (50% transparent)",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^wm_apply_"))
+async def wm_apply_callback(client: Client, query: CallbackQuery):
+    """Apply watermark"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    # Check if we have watermark input
+    if 'watermark_settings' not in user_data[user_id]:
+        await query.answer("Configure watermark first!", show_alert=True)
+        return
+        
+    await query.answer("Applying watermark...")
+    
+    settings = user_data[user_id].get('watermark_settings', {})
+    await process_video(client, query, 'watermark', settings)
+
+
+@bot.on_callback_query(filters.regex(r"^confirm_"))
+async def confirm_callback(client: Client, query: CallbackQuery):
+    """Handle confirmation"""
+    parts = query.data.split("_")
+    action = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer("Confirmed!")
+    
+    if action == 'streamswap':
+        await process_video(client, query, 'streamswap', {})
+    else:
+        await query.answer("Unknown action", show_alert=True)
+
+
+@bot.on_callback_query(filters.regex(r"^cancel_"))
+async def cancel_callback(client: Client, query: CallbackQuery):
+    """Generic cancel/close"""
+    await close_callback(client, query)
 
 
 @bot.on_callback_query(filters.regex(r"^preset_"))
@@ -633,6 +918,164 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                     output_path = result
             else:
                 error = result
+
+        elif operation == 'encode':
+            success, result = await encode_video(input_path, output_path, **options)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'metadata':
+            metadata = options.get('metadata', {})
+            success, result = await edit_metadata(input_path, output_path, metadata)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'ffmpeg_cmd':
+            args = options.get('args', '')
+            success, result = await execute_custom_command(input_path, args, output_path)
+            if success:
+                pass # output_path is already set
+            else:
+                error = result
+
+        elif operation == 'trim':
+            start = options.get('start')
+            end = options.get('end')
+            success, result = await trim_video(input_path, output_path, start, end)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'rename':
+            new_name = options.get('new_name', 'video')
+            new_path = os.path.join(output_dir, f"{new_name}{ext}")
+            try:
+                os.rename(input_path, new_path)
+                output_path = new_path
+                success = True
+            except Exception as e:
+                success = False
+                error = str(e)
+
+        elif operation == 'sub_intro':
+            text = options.get('text', '')
+            success, result = await add_subtitle_intro(input_path, text, output_path, duration=5)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'streamswap':
+            success, result = await swap_streams(input_path, output_path)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'merge_video':
+            # Need to download second video
+            msg = user_data[user_id].get('second_video_message')
+            if not msg:
+                success = False
+                error = "Second video not found"
+            else:
+                await status_msg.edit_text("📥 Downloading second video...")
+                second_path = await download_file(msg, status_msg)
+                
+                await status_msg.edit_text("⚙️ Merging videos...")
+                success, result = await merge_videos(input_path, second_path, output_path)
+                
+                # Cleanup second video
+                try:
+                    os.remove(second_path)
+                except:
+                    pass
+                    
+                if success:
+                    output_path = result
+                else:
+                    error = result
+
+        elif operation == 'watermark':
+            # Text or Image?
+            wm_text = options.get('text')
+            if wm_text:
+                success, result = await add_text_watermark(input_path, wm_text, output_path, **options)
+            else:
+                # Image
+                # Need to download image if not local (but wait, how do we get image?)
+                # file_handler handles watermark_image -> stores message
+                msg = user_data[user_id].get('watermark_message')
+                if msg:
+                     # Download image
+                     wm_path = await download_file(msg, status_msg)
+                     success, result = await add_image_watermark(input_path, wm_path, output_path, **options)
+                     try:
+                         os.remove(wm_path)
+                     except:
+                         pass
+                else:
+                    success = False
+                    error = "Watermark image/text not provided"
+            
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation in ['add_subtitle', 'hardsub']:
+            # Need subtitle file
+            msg = user_data[user_id].get('subtitle_message')
+            if not msg:
+                success = False
+                error = "Subtitle file not found"
+            else:
+                await status_msg.edit_text("📥 Downloading subtitles...")
+                sub_path = await download_file(msg, status_msg)
+                
+                await status_msg.edit_text("⚙️ Adding subtitles...")
+                if operation == 'hardsub':
+                    success, result = await burn_subtitles(input_path, sub_path, output_path)
+                else:
+                    success, result = await add_subtitle_to_video(input_path, sub_path, output_path)
+                
+                try:
+                    os.remove(sub_path)
+                except:
+                    pass
+                    
+                if success:
+                    output_path = result
+                else:
+                    error = result
+
+        elif operation == 'add_audio':
+            # Need audio file
+            msg = user_data[user_id].get('audio_message')
+            if not msg:
+                success = False
+                error = "Audio file not found"
+            else:
+                await status_msg.edit_text("📥 Downloading audio...")
+                aud_path = await download_file(msg, status_msg)
+                
+                await status_msg.edit_text("⚙️ Adding audio...")
+                success, result = await add_audio_to_video(input_path, aud_path, output_path)
+                
+                try:
+                    os.remove(aud_path)
+                except:
+                    pass
+                    
+                if success:
+                    output_path = result
+                else:
+                    error = result
         
         else:
             success = False
