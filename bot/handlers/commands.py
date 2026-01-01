@@ -152,8 +152,10 @@ async def settings_command(client: Client, message: Message):
         return
     
     # Add user to DB if not exists (JIC)
+    # Add user to DB if not exists (JIC)
     db = get_db()
-    await db.add_user(user.id, user.username, user.first_name)
+    if db:
+        await db.add_user(user.id, user.username, user.first_name)
     
     from bot.keyboards.settings_menu import open_settings
     menu = await open_settings(user.id)
@@ -515,7 +517,7 @@ async def thumb_command(client: Client, message: Message):
         return
 
     db = get_db()
-    thumbnail = await db.get_thumbnail(user.id)
+    thumbnail = await db.get_thumbnail(user.id) if db else None
     
     from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     buttons = [
@@ -549,8 +551,9 @@ async def reset_command(client: Client, message: Message):
         return
         
     db = get_db()
-    await db.delete_user(user.id)
-    await db.add_user(user.id, user.username, user.first_name)
+    if db:
+        await db.delete_user(user.id)
+        await db.add_user(user.id, user.username, user.first_name)
     
     await message.reply_text("✅ <b>Settings have been reset to default!</b>")
 
