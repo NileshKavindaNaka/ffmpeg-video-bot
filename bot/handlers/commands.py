@@ -659,8 +659,19 @@ async def speedtest_command(client: Client, message: Message):
             f"<b>Country:</b> {result['server']['country']}"
         )
         
-        await status_msg.delete()
-        await message.reply_photo(photo=result['share'], caption=caption)
+        try:
+            await status_msg.delete()
+        except:
+            pass
+            
+        if result.get('share'):
+            try:
+                await message.reply_photo(photo=result['share'], caption=caption)
+            except Exception as args:
+                LOGGER.error(f"Failed to send speedtest image: {args}")
+                await message.reply_text(caption + f"\n\n<b>Link:</b> <a href='{result['share']}'>View Image</a>")
+        else:
+            await message.reply_text(caption)
         
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {e}")
