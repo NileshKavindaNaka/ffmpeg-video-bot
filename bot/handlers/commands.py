@@ -151,24 +151,90 @@ async def settings_command(client: Client, message: Message):
     if not is_authorized(user.id):
         return
     
+    # Add user to DB if not exists (JIC)
     db = get_db()
-    if db:
-        settings = await db.get_user_settings(user.id)
-    else:
-        settings = {}
+    await db.add_user(user.id, user.username, user.first_name)
     
-    settings_text = (
-        f"<b>⚙️ Your Settings</b>\n\n"
-        f"<b>Video Codec:</b> {settings.get('video_codec', 'libx264')}\n"
-        f"<b>Audio Codec:</b> {settings.get('audio_codec', 'aac')}\n"
-        f"<b>CRF Quality:</b> {settings.get('crf', 23)}\n"
-        f"<b>Preset:</b> {settings.get('preset', 'medium')}\n"
-        f"<b>Resolution:</b> {settings.get('resolution', 'Original')}\n"
-        f"<b>Keep Source:</b> {'✅' if settings.get('keep_source') else '❌'}\n"
-        f"<b>Watermark:</b> {'✅' if settings.get('watermark_enabled') else '❌'}\n"
-    )
+    from bot.keyboards.settings_menu import open_settings
+    menu = await open_settings(user.id)
     
-    await message.reply_text(settings_text, reply_markup=close_button(user.id))
+    await message.reply_text("<b>⚙️ Settings Menu</b>", reply_markup=menu)
+
+
+@bot.on_message(filters.command("vset") & filters.private)
+async def vset_command(client: Client, message: Message):
+    """Handle /vset command (View Settings) - Reference Bot Style"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+
+    db = get_db()
+    if not db:
+        await message.reply_text("❌ Database not connected.")
+        return
+
+    # Helper to format boolean
+    def tick(val):
+        return '☑️' if val else ''
+
+    # Fetch all settings
+    s = await db.get_user_settings(user.id)
+    
+    # Format Codecs
+    video_codec = "H265 (HEVC)" if s.get('hevc') else "H264"
+    audio_codec = (s.get('audio_codec') or "AAC").upper()
+    if audio_codec == 'DD': audio_codec = 'AC3'
+    
+    # Values
+    res = s.get('resolution') or "Source"
+    if res == 'OG': res = "Source"
+    
+    tune = "Animation" if s.get('tune') else "Film"
+    preset = (s.get('preset') or "medium").title()
+    crf = s.get('crf', 26)
+    ref = s.get('reframe') or "Pass"
+    fps = s.get('frame') or "Source"
+    
+    # Audio
+    asr = s.get('sample_rate') or "Source"
+    abr = s.get('audio_bitrate') or "Source"
+    chn = s.get('channels') or "Source"
+    
+    # Subs
+    hardsub = tick(s.get('hardsub'))
+    softsub = tick(s.get('subtitles'))
+    
+    # Watermark
+    wm_enabled = tick(s.get('watermark_enabled'))
+    meta_w = s.get('metadata_w') and "Weeb-Zone" or "Default"
+
+    msg = f"""<b>Encode Settings:</b>
+
+<b>📹 Video Settings</b>
+Format : {s.get('output_format', 'MKV')}
+Quality: {res}
+Codec: {video_codec}
+Aspect: {s.get('aspect') or 'Source'}
+Reframe: {ref} | FPS: {fps}
+Tune: {tune}
+Preset: {preset}
+Bits: {s.get('bits') or '8'} | CRF: {crf}
+CABAC: {tick(s.get('cabac'))}
+
+<b>📜 Subtitles Settings</b>
+Hardsub {hardsub} | Softsub {softsub}
+
+<b>©️ Watermark Settings</b>
+Metadata: {meta_w}
+Video {wm_enabled}
+
+<b>🔊 Audio Settings</b>
+Codec: {audio_codec}
+Sample Rate : {asr}
+Bit Rate: {abr}
+Channels: {chn}
+"""
+    await message.reply_text(msg, reply_markup=close_button(user.id))
 
 
 @bot.on_message(filters.command("broadcast") & filters.private)
@@ -247,9 +313,21 @@ async def update_command(client: Client, message: Message):
             await status_msg.edit_text(
                 "✅ <b>Update pulled successfully!</b>\n\n"
                 f"<code>{output[:500]}</code>\n\n"
-                "🔄 <b>Restarting bot...</b>"
+                "📦 <b>Installing requirements...</b>"
             )
             LOGGER.info(f"Update pulled: {output[:100]}")
+            
+            # PIP INSTALL
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+                    check=True
+                )
+            except Exception as e:
+                LOGGER.error(f"Pip install failed: {e}")
+                # Continue anyway? Or stop? Let's try to continue.
+            
+            await status_msg.edit_text("🔄 <b>Restarting bot...</b>")
             
             # Restart after update
             os.execl(sys.executable, sys.executable, "-m", "bot")
@@ -335,4 +413,307 @@ async def log_command(client: Client, message: Message):
         )
     except Exception as e:
         await message.reply_text(f"❌ Error reading log: {e}")
+
+
+@bot.on_message(filters.command("unzip") & filters.private)
+async def unzip_command(client: Client, message: Message):
+    """Handle /unzip command"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+
+    if not message.reply_to_message or not message.reply_to_message.document:
+        await message.reply_text("❌ Reply to a document to unzip it.")
+        return
+        
+    status_msg = await message.reply_text("⏳ Downloading file...")
+    
+    try:
+        # Download
+        from bot.handlers.file_handler import download_file
+        file_path = await download_file(message.reply_to_message, status_msg)
+        
+        await status_msg.edit_text("⏳ Extracting...")
+        
+        output_dir = os.path.join(os.path.dirname(file_path), "extracted_" + str(time()))
+        os.makedirs(output_dir, exist_ok=True)
+        
+        from bot.utils.archive import extract_archive
+        success = await extract_archive(file_path, output_dir)
+        
+        if success:
+            await status_msg.edit_text("✅ Extracted! Uploading contents...")
+            
+            # Upload extracted files
+            files = []
+            for root, _, filenames in os.walk(output_dir):
+                for f in filenames:
+                    files.append(os.path.join(root, f))
+            
+            if not files:
+                await status_msg.edit_text("❌ Archive was empty.")
+                return
+                
+            from bot.handlers.file_handler import upload_file
+            # Upload each file (limit to reasonable amount?)
+            count = 0
+            for f in files:
+                if count > 10:
+                    await client.send_message(message.chat.id, "⚠️ Too many files, stopping upload.")
+                    break
+                await upload_file(client, message.chat.id, f, status_msg, caption=f"📄 {os.path.basename(f)}")
+                count += 1
+                
+            await status_msg.delete()
+        else:
+            await status_msg.edit_text("❌ Extraction failed.")
+            
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error: {e}")
+
+
+@bot.on_message(filters.command("zip") & filters.private)
+async def zip_command(client: Client, message: Message):
+    """Handle /zip command"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+
+    if not message.reply_to_message:
+        await message.reply_text("❌ Reply to a file/video to zip it.")
+        return
+        
+    status_msg = await message.reply_text("⏳ Downloading file...")
+    
+    try:
+        from bot.handlers.file_handler import download_file
+        file_path = await download_file(message.reply_to_message, status_msg)
+        
+        await status_msg.edit_text("⏳ Archiving...")
+        
+        from bot.utils.archive import create_archive
+        # Default name
+        out_name = file_path + ".zip"
+        archive_path = await create_archive(file_path, out_name, "zip")
+        
+        if archive_path:
+            await status_msg.edit_text("✅ Archived! Uploading...")
+            from bot.handlers.file_handler import upload_file
+            await upload_file(client, message.chat.id, archive_path, status_msg, caption="📦 Archived File")
+        else:
+            await status_msg.edit_text("❌ Archiving failed.")
+            
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error: {e}")
+
+
+@bot.on_message(filters.command("thumb") & filters.private)
+async def thumb_command(client: Client, message: Message):
+    """Handle /thumb command (View/Set/Delete Thumbnail)"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+
+    db = get_db()
+    thumbnail = await db.get_thumbnail(user.id)
+    
+    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [
+            InlineKeyboardButton("Set/Replace Thumbnail", callback_data=f"set_thumb_{user.id}"),
+            InlineKeyboardButton("Delete Thumbnail", callback_data=f"del_thumb_{user.id}")
+        ],
+        [
+            InlineKeyboardButton("Close", callback_data=f"close_{user.id}")
+        ]
+    ]
+    
+    if thumbnail:
+        await message.reply_photo(
+            photo=thumbnail,
+            caption="🖼️ <b>Your current custom thumbnail.</b>",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+    else:
+        await message.reply_text(
+            "🖼️ <b>You don't have a custom thumbnail set.</b>",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+
+@bot.on_message(filters.command("reset") & filters.private)
+async def reset_command(client: Client, message: Message):
+    """Handle /reset command"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+        
+    db = get_db()
+    await db.delete_user(user.id)
+    await db.add_user(user.id, user.username, user.first_name)
+    
+    await message.reply_text("✅ <b>Settings have been reset to default!</b>")
+
+
+@bot.on_message(filters.command("clean") & filters.private)
+async def clean_command(client: Client, message: Message):
+    """Handle /clean command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+        
+    import shutil
+    from bot import DOWNLOAD_DIR, OUTPUT_DIR
+    
+    status_msg = await message.reply_text("🧹 Cleaning cache...")
+    
+    try:
+        # Clean downloads
+        for item in os.listdir(DOWNLOAD_DIR):
+            item_path = os.path.join(DOWNLOAD_DIR, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+                
+        # Clean outputs
+        for item in os.listdir(OUTPUT_DIR):
+            item_path = os.path.join(OUTPUT_DIR, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+                
+        await status_msg.edit_text("✅ <b>Cache cleaned successfully!</b>")
+        
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error during clean: {e}")
+
+
+@bot.on_message(filters.command("dl") & filters.private)
+async def dl_command(client: Client, message: Message):
+    """Handle /dl command"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+        
+    if not message.reply_to_message:
+        await message.reply_text("Reply to a file/video to download and process it.")
+        return
+        
+    # Trigger processing manually
+    from bot.handlers.file_handler import handle_video, handle_audio
+    msg = message.reply_to_message
+    
+    if msg.video or msg.document:
+        await handle_video(client, msg)
+    elif msg.audio:
+        await handle_audio(client, msg)
+    else:
+        await message.reply_text("❌ Unsupported media type.")
+
+
+@bot.on_message(filters.command("speedtest") & filters.private)
+async def speedtest_command(client: Client, message: Message):
+    """Handle /speedtest command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+        
+    status_msg = await message.reply_text("🚀 Running speedtest...")
+    
+    try:
+        import asyncio
+        import json
+        
+        proc = await asyncio.create_subprocess_exec(
+            'speedtest-cli', '--json',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        if proc.returncode != 0:
+            await status_msg.edit_text(f"❌ Speedtest failed: {stderr.decode().strip()}")
+            return
+            
+        result = json.loads(stdout.decode())
+        
+        def humanbytes(size):
+            # Simple helper
+            power = 2**10
+            n = 0
+            power_labels = {0: '', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+            while size > power:
+                size /= power
+                n += 1
+            return f"{size:.2f} {power_labels[n]}B"
+            
+        caption = (
+            f"<b>🚀 SPEEDTEST RESULT</b>\n\n"
+            f"<b>Ping:</b> {result['ping']} ms\n"
+            f"<b>Download:</b> {humanbytes(result['download'] / 8)}/s\n"
+            f"<b>Upload:</b> {humanbytes(result['upload'] / 8)}/s\n"
+            f"<b>ISP:</b> {result['client']['isp']}\n"
+            f"<b>Country:</b> {result['server']['country']}"
+        )
+        
+        await status_msg.delete()
+        await message.reply_photo(photo=result['share'], caption=caption)
+        
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error: {e}")
+
+
+@bot.on_message(filters.command("status") & filters.private)
+async def status_command(client: Client, message: Message):
+    """Handle /status command"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+    
+    # System Stats
+    cpu = psutil.cpu_percent()
+    ram = psutil.virtual_memory()
+    
+    # Active Tasks
+    tasks = []
+    for uid, data in user_data.items():
+        if 'progress' in data and not data['progress'].cancelled:
+             fname = data.get('file_name', 'Unknown')
+             status = "Active"
+             tasks.append(f"• User {uid}: {fname} ({status})")
+             
+    task_text = "\n".join(tasks) if tasks else "No active tasks."
+    
+    msg = (
+        f"<b>📊 System Status</b>\n\n"
+        f"<b>CPU:</b> {cpu}% | <b>RAM:</b> {ram.percent}%\n\n"
+        f"<b>🔄 Active Tasks:</b>\n"
+        f"{task_text}"
+    )
+    
+    await message.reply_text(msg, reply_markup=close_button(user.id))
+
+
+@bot.on_message(filters.command("queue") & filters.private)
+async def queue_command(client: Client, message: Message):
+    """Handle /queue command - Show active tasks"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+        
+    tasks = []
+    count = 0
+    for uid, data in user_data.items():
+        if 'progress' in data and not data['progress'].cancelled:
+             fname = data.get('file_name', 'Unknown')
+             op = data.get('operation', 'Unknown')
+             tasks.append(f"<b>{count+1}.</b> {fname}\n   └ <i>{op}</i> (User: {uid})")
+             count += 1
+             
+    if not tasks:
+        await message.reply_text("🥱 <b>No Active Tasks.</b>")
+    else:
+        text = f"<b>🔄 Active Queue ({count})</b>\n\n" + "\n\n".join(tasks)
+        await message.reply_text(text, reply_markup=close_button(user.id))
+
 

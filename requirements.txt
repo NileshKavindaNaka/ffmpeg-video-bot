@@ -9,3 +9,14 @@ psutil==5.9.7
 google-api-python-client==2.111.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0
+# New dependencies for reference bot features
+beautifulsoup4==4.9.1
+bs4==0.0.1
+lxml
+cloudscraper
+requests
+js2py
+hachoir
+lk21
+patool
+speedtest-cli

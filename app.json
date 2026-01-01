@@ -1,0 +1,52 @@
+{
+    "name": "FFmpeg Processor Bot",
+    "description": "A powerful Telegram bot for video processing using FFmpeg (V2.0)",
+    "logo": "https://telegram.org/img/t_logo.png",
+    "keywords": [
+        "telegram",
+        "bot",
+        "ffmpeg",
+        "video",
+        "processing"
+    ],
+    "repository": "https://github.com/yourusername/ffmpeg-processor-bot",
+    "env": {
+        "BOT_TOKEN": {
+            "description": "Your Telegram Bot Token",
+            "required": true
+        },
+        "API_ID": {
+            "description": "Telegram API ID",
+            "required": true
+        },
+        "API_HASH": {
+            "description": "Telegram API Hash",
+            "required": true
+        },
+        "OWNER_ID": {
+            "description": "Your Telegram User ID",
+            "required": true
+        },
+        "MONGO_URI": {
+            "description": "MongoDB Connection String",
+            "required": true
+        },
+        "GDRIVE_ENABLED": {
+            "description": "Enable Google Drive Upload (True/False)",
+            "value": "False",
+            "required": false
+        },
+        "LOG_CHANNEL": {
+            "description": "Channel ID for logging (optional)",
+            "required": false
+        }
+    },
+    "buildpacks": [
+        {
+            "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+        },
+        {
+            "url": "heroku/python"
+        }
+    ]
+}

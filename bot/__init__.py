@@ -65,6 +65,9 @@ if AUTHORIZED_USERS:
 else:
     AUTHORIZED_USERS = set()
 
+# Log Channel
+LOG_CHANNEL = int(environ.get('LOG_CHANNEL', 0))
+
 # Create directories
 for directory in [DOWNLOAD_DIR, OUTPUT_DIR]:
     makedirs(directory, exist_ok=True)

@@ -1,6 +1,8 @@
-# FFmpeg Processor Bot
+# FFmpeg Processor Bot V2.0 🚀
 
-A powerful Telegram bot for video processing using FFmpeg. Deploy on your VPS for full control over video manipulation.
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+
+A powerful Telegram bot for video processing using FFmpeg. Deploy on your VPS or Heroku for full control over video manipulation.
 
 ## Features
 
@@ -141,6 +143,16 @@ python3 -m bot
 | `/restart` | Restart the bot (owner only) |
 | `/log` | View bot logs (owner only) |
 | `/shell` | Run shell commands (owner only) |
+| `/reset` | Reset user settings |
+| `/clean` | Clean defaults/cache (owner only) |
+| `/speedtest` | Run speedtest (owner only) |
+| `/status` | View system status and active queue |
+| `/queue` | View active tasks list |
+| `/dl` | Reply to file/video to process |
+| `/thumb` | View/Set custom thumbnail |
+| `/zip` | Archive file/video |
+| `/unzip` | Extract archive |
+| `/vset` | View detailed settings |
 
 ## Usage
 

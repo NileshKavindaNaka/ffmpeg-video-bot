@@ -1128,6 +1128,13 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         await query.message.edit_text("❌ No video found. Send a video first.")
         return
     
+    # Check if user already has an active task
+    if 'progress' in user_data[user_id] and not user_data[user_id]['progress'].cancelled:
+        # Check if it's actually running (start_time check or similar?) 
+        # For now assume existence of progress object implies running task
+        await query.answer("⚠️ You already have an active task! Please wait.", show_alert=True)
+        return
+
     # Get original message with the video
     original_msg = user_data[user_id].get('message_id')
     if not original_msg:
@@ -1707,3 +1714,192 @@ async def cancel_upload_callback(client: Client, query: CallbackQuery):
     await query.message.delete()
     await query.answer("Cancelled and deleted!")
 
+@bot.on_callback_query(filters.regex(r"^open_settings$"))
+@bot.on_callback_query(filters.regex(r"^back_to_main_settings$"))
+async def open_settings_callback(client: Client, query: CallbackQuery):
+    """Open main settings menu"""
+    from bot.keyboards.settings_menu import open_settings
+    await query.message.edit_text(
+        "<b>⚙️ Settings Menu</b>",
+        reply_markup=await open_settings(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^set_video_codec$"))
+async def set_video_codec_callback(client: Client, query: CallbackQuery):
+    """Open video settings"""
+    from bot.keyboards.settings_menu import video_settings_menu
+    await query.message.edit_text(
+        "<b>📹 Video Settings</b>\nToggle HEVC (x265) on/off.",
+        reply_markup=await video_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^toggle_hevc$"))
+async def toggle_hevc_callback(client: Client, query: CallbackQuery):
+    """Toggle HEVC setting"""
+    from bot.utils.db_handler import get_db
+    from bot.keyboards.settings_menu import video_settings_menu
+    
+    db = get_db()
+    current = await db.get_hevc(query.from_user.id)
+    await db.set_hevc(query.from_user.id, not current)
+    
+    await query.message.edit_reply_markup(
+        reply_markup=await video_settings_menu(query.from_user.id)
+    )
+    await query.answer(f"HEVC {'Enabled' if not current else 'Disabled'}!")
+
+@bot.on_callback_query(filters.regex(r"^set_resolution$"))
+async def set_resolution_menu_callback(client: Client, query: CallbackQuery):
+    """Open resolution menu"""
+    from bot.keyboards.settings_menu import resolution_settings_menu
+    await query.message.edit_text(
+        "<b>🖥 Resolution Settings</b>\nSelect target resolution.",
+        reply_markup=await resolution_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^set_res_"))
+async def set_resolution_val_callback(client: Client, query: CallbackQuery):
+    """Set resolution value"""
+    res = query.data.split("_")[2]
+    from bot.keyboards.settings_menu import resolution_settings_menu
+    from bot.utils.db_handler import get_db
+    
+    db = get_db()
+    await db.set_resolution(query.from_user.id, res)
+    
+    await query.message.edit_reply_markup(
+        reply_markup=await resolution_settings_menu(query.from_user.id)
+    )
+    await query.answer(f"Resolution set to {res}")
+
+@bot.on_callback_query(filters.regex(r"^open_audio_settings$"))
+async def open_audio_settings_callback(client: Client, query: CallbackQuery):
+    """Open audio settings"""
+    from bot.keyboards.settings_menu import audio_settings_menu
+    await query.message.edit_text(
+        "<b>🔊 Audio Settings</b>",
+        reply_markup=await audio_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^close_settings$"))
+async def close_settings_callback(client: Client, query: CallbackQuery):
+    await query.message.delete()
+@bot.on_callback_query(filters.regex(r"^rename_"))
+async def rename_callback(client: Client, query: CallbackQuery):
+    """Handle Rename button (Main Menu)"""
+    user_id = int(query.data.split("_")[1])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    user_data[user_id]['operation'] = 'rename'
+    user_data[user_id]['waiting_for'] = 'new_filename'
+    
+    await query.message.edit_text(
+        "<b>✏️ Rename File</b>\n\n"
+        "Send me the new filename (with extension).\n"
+        "Example: <code>my_video.mp4</code>",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^final_rename_"))
+async def final_rename_callback(client: Client, query: CallbackQuery):
+    """Handle Rename button (After Process)"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    user_data[user_id]['operation'] = 'final_rename'
+    user_data[user_id]['waiting_for'] = 'final_rename_input'
+    
+    await query.message.edit_text(
+        "<b>✏️ Rename Output</b>\n\n"
+        "Send me the new filename for the processed video.\n"
+        "Example: <code>encoded_video.mkv</code>",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^final_zip_"))
+async def final_zip_callback(client: Client, query: CallbackQuery):
+    """Handle Zip & Upload (After Process)"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer("Zipping and uploading...")
+    
+    # Trigger final processing with ZIP flag
+    # We can reuse the 'upload_to_telegram' flow but wrap it
+    if 'output_path' not in user_data[user_id]:
+        await query.answer("File not found!", show_alert=True)
+        return
+        
+    output_path = user_data[user_id]['output_path']
+    new_path = output_path + ".zip"
+    
+    status_msg = await query.message.edit_text("⏳ Zipping file...")
+    
+    try:
+        from bot.utils.archive import create_archive
+        zip_path = await create_archive(output_path, new_path, "zip")
+        
+        if zip_path:
+            # Update output_path to point to zip
+            user_data[user_id]['output_path'] = zip_path
+            # Proceed to upload
+            from bot.handlers.file_handler import upload_processed_file
+            await upload_processed_file(client, user_id, status_msg, "telegram") # Defaulting to Telegram
+        else:
+            await status_msg.edit_text("❌ Zipping failed.")
+            
+    except Exception as e:
+         await status_msg.edit_text(f"❌ Error: {e}")
+
+
+@bot.on_callback_query(filters.regex(r"^set_thumb_"))
+async def set_thumb_callback(client: Client, query: CallbackQuery):
+    """Handle Set Thumbnail"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    user_data[user_id]['waiting_for'] = 'set_thumbnail'
+    
+    await query.message.edit_text(
+        "🖼️ <b>Send me a photo to set as your custom thumbnail.</b>\n"
+        "Sending a photo now will save it as your thumbnail.",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^del_thumb_"))
+async def del_thumb_callback(client: Client, query: CallbackQuery):
+    """Handle Delete Thumbnail"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    await db.set_thumbnail(user_id, None)
+    
+    await query.message.edit_text("✅ <b>Thumbnail deleted!</b>")
+    await query.answer()

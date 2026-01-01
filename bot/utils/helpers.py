@@ -125,3 +125,53 @@ async def clean_temp_files(directory: str, max_age_hours: int = 24):
                     LOGGER.info(f"Cleaned old file: {file_path}")
             except Exception as e:
                 LOGGER.error(f"Error cleaning file {file_path}: {e}")
+
+import aiohttp
+from bot.utils.progress import Progress
+
+async def download_http_file(url: str, directory: str, status_msg, user_id: int):
+    """Download a file from HTTP URL with progress"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    LOGGER.error(f"Download failed: {response.status}")
+                    return None
+                
+                # Try to get filename from content-disposition
+                filename = None
+                if "Content-Disposition" in response.headers:
+                    import re
+                    fname_match = re.findall('filename="?([^"]+)"?', response.headers["Content-Disposition"])
+                    if fname_match:
+                        filename = fname_match[0]
+                
+                if not filename:
+                    filename = os.path.basename(url.split("?")[0])
+                    if not filename:
+                        filename = "downloaded_file"
+                
+                # Sanitize
+                filename = sanitize_filename(filename)
+                
+                file_path = os.path.join(directory, filename)
+                total_size = int(response.headers.get("Content-Length", 0))
+                
+                progress = Progress(status_msg, "📥 Downloading URL", user_id=user_id, filename=filename)
+                
+                with open(file_path, "wb") as f:
+                    downloaded = 0
+                    while True:
+                        chunk = await response.content.read(1024 * 1024) # 1MB chunks
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            await progress.progress_callback(downloaded, total_size)
+                            
+                return file_path
+
+    except Exception as e:
+        LOGGER.error(f"HTTP Download Exception: {e}")
+        return None

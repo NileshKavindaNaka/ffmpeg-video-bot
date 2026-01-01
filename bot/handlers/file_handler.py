@@ -169,13 +169,34 @@ async def handle_audio(client: Client, message: Message):
 
 @bot.on_message(filters.private & filters.photo)
 async def handle_photo(client: Client, message: Message):
-    """Handle photos (for watermark)"""
+    """Handle photos (for watermark or thumbnail)"""
     user = message.from_user
     
     if not is_authorized(user.id):
         return
     
-    if user.id in user_data and user_data[user.id].get('waiting_for') == 'watermark_image':
+    waiting_for = user_data.get(user.id, {}).get('waiting_for')
+    
+    # 1. Set Thumbnail
+    if waiting_for == 'set_thumbnail':
+        from bot.utils.db_handler import get_db
+        db = get_db()
+        
+        # Save highest quality file_id
+        file_id = message.photo.file_id
+        await db.set_thumbnail(user.id, file_id)
+        
+        user_data[user.id]['waiting_for'] = None
+        
+        await message.reply_text(
+            "✅ <b>Custom thumbnail saved!</b>\n"
+            "It will be used for all future video uploads.",
+            quote=True
+        )
+        return
+
+    # 2. Watermark Image
+    if waiting_for == 'watermark_image':
         user_data[user.id]['watermark_message'] = message
         user_data[user.id]['waiting_for'] = None
         
@@ -184,18 +205,254 @@ async def handle_photo(client: Client, message: Message):
             "Now configure position, opacity, etc.",
             quote=True
         )
-        # Note: We don't verify 'watermark' operation here because we still need to apply settings.
-        # We just go back to watermark menu (or show it).
-        # But we need to update settings to say we have an image.
+        
         if 'watermark_settings' not in user_data[user.id]:
             user_data[user.id]['watermark_settings'] = {}
-        # We don't save path yet, we download on apply.
         
         from bot.keyboards.menus import watermark_menu
         await message.reply_text(
             "Image saved. Configure settings:",
             reply_markup=watermark_menu(user.id)
         )
+        return
+
+
+@bot.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings", "vset", "cancel", "stats", "log", "broadcast", "zip", "unzip", "thumb"]))
+async def handle_text_input(client: Client, message: Message):
+    # ... (rest of handle_text_input is unchanged, but we needed to modify handle_photo first)
+    # Actually, I am replacing the file content from handle_photo onwards, so I need to include handle_text_input if I am replacing a chunk that covers both.
+    # But I can just target handle_photo block if I am careful.
+    # Let's just implement handle_photo correctly.
+    pass 
+    # I will rely on the fact that I am replacing handle_photo and can leave handle_text_input alone if I target correctly.
+    # But wait, looking at the previous file view, handle_photo ends around line 199.
+    # I'll just replace the handle_photo function.
+
+async def upload_file(client: Client, chat_id: int, file_path: str | list, status_msg: Message, caption: str = None, user_id: int = None):
+    """Upload file with progress"""
+    
+    # Handle list of files (Media Group)
+    if isinstance(file_path, list):
+        from pyrogram.types import InputMediaPhoto
+        media = []
+        for f in file_path:
+            # Assume photos for now (screenshots)
+            media.append(InputMediaPhoto(f))
+        
+        await status_msg.edit_text("📤 Uploading album...")
+        try:
+            await client.send_media_group(chat_id, media)
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Upload failed: {e}")
+            raise e
+        return
+
+    # Single File
+    file_name = os.path.basename(file_path) if isinstance(file_path, str) else "Album"
+    progress = Progress(status_msg, "📤 Uploading", user_id=user_id, filename=file_name)
+    
+    # Store progress for cancellation
+    if user_id and user_id in user_data:
+        user_data[user_id]['progress'] = progress
+    
+    # Prepare Thumbnail
+    thumb_path = None
+    if user_id:
+        from bot.utils.db_handler import get_db
+        db = get_db()
+        thumb_id = await db.get_thumbnail(user_id)
+        
+        if thumb_id:
+            try:
+                # Download thumb to temp
+                import time
+                temp_thumb = os.path.join(DOWNLOAD_DIR, f"thumb_{user_id}_{int(time.time())}.jpg")
+                await client.download_media(thumb_id, file_name=temp_thumb)
+                if os.path.exists(temp_thumb):
+                    thumb_path = temp_thumb
+            except Exception as e:
+                LOGGER.error(f"Failed to download custom thumbnail: {e}")
+
+    # Start Upload
+    try:
+        video_exts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
+        ext = os.path.splitext(file_name)[1].lower()
+        
+        sent_msg = None
+
+        if ext in video_exts:
+            sent_msg = await client.send_video(
+                chat_id,
+                file_path,
+                caption=caption or f"✅ <code>{file_name}</code>",
+                progress=progress.progress_callback,
+                thumb=thumb_path
+            )
+        else:
+            sent_msg = await client.send_document(
+                chat_id,
+                file_path,
+                caption=caption or f"✅ <code>{file_name}</code>",
+                progress=progress.progress_callback,
+                thumb=thumb_path
+            )
+            
+        # Log Channel Forwarding
+        from bot import LOG_CHANNEL
+        if sent_msg and LOG_CHANNEL:
+            try:
+                await sent_msg.copy(LOG_CHANNEL, caption=f"Processing Request from {user_id}\n\n" + (sent_msg.caption or ""))
+            except Exception as e:
+                LOGGER.error(f"Failed to forward to log channel: {e}")
+                
+    except Exception as e:
+        if progress.cancelled:
+            raise asyncio.CancelledError("Cancelled by user")
+        raise e
+    finally:
+        # Cleanup thumb
+        if thumb_path and os.path.exists(thumb_path):
+            try:
+                os.remove(thumb_path)
+            except:
+                pass
+
+@bot.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings", "vset", "cancel", "stats", "log", "broadcast", "zip", "unzip"]))
+async def handle_text_input(client: Client, message: Message):
+    """Handle text inputs (Rename, URL, etc.)"""
+    user = message.from_user
+    if not is_authorized(user.id):
+        return
+
+    text = message.text.strip()
+    waiting_for = user_data.get(user.id, {}).get('waiting_for')
+
+    # 1. Handle Rename Input
+    if waiting_for == 'new_filename':
+        old_path = user_data[user.id].get('processing_file') or user_data[user.id].get('file_path')
+        if not old_path or not os.path.exists(old_path):
+             await message.reply_text("❌ Original file lost. Please upload again.")
+             return
+             
+        new_name = sanitize_filename(text)
+        new_path = os.path.join(os.path.dirname(old_path), new_name)
+        
+        try:
+            os.rename(old_path, new_path)
+            # Update data
+            user_data[user.id]['file_path'] = new_path
+            user_data[user.id]['processing_file'] = new_path
+            user_data[user.id]['file_name'] = new_name
+            user_data[user.id]['waiting_for'] = None
+            
+            await message.reply_text(
+                f"✅ Renamed to: <code>{new_name}</code>",
+                reply_markup=main_menu(user.id),
+                quote=True
+            )
+        except Exception as e:
+            await message.reply_text(f"❌ Rename failed: {e}")
+        return
+
+    # 2. Handle Final Rename Input
+    if waiting_for == 'final_rename_input':
+        old_path = user_data[user.id].get('output_path')
+        if not old_path or not os.path.exists(old_path):
+             await message.reply_text("❌ Processed file lost.")
+             return
+             
+        new_name = sanitize_filename(text)
+        new_path = os.path.join(os.path.dirname(old_path), new_name)
+        
+        try:
+            os.rename(old_path, new_path)
+            # Update data
+            user_data[user.id]['output_path'] = new_path
+            user_data[user.id]['waiting_for'] = None
+            
+            status_msg = await message.reply_text(f"✅ Renamed to: <code>{new_name}</code>\nUploading...")
+            
+            # Proceed to upload
+            from bot.handlers.callbacks import upload_processed_file
+            await upload_processed_file(client, user.id, status_msg, "telegram")
+            
+        except Exception as e:
+            await message.reply_text(f"❌ Rename failed: {e}")
+        return
+
+    # 3. Handle Other Inputs (e.g., FFMPEG CMD, Sub Intro) - to be implemented if needed
+    
+    # 4. Fallback: Handle URL
+    if text.startswith("http://") or text.startswith("https://"):
+        await handle_url_logic(client, message, text)
+    else:
+        # Just chat?
+        pass
+
+
+from bot.utils.helpers import sanitize_filename
+
+async def handle_url_logic(client, message, text):
+    """Refactored URL handling logic"""
+    user = message.from_user
+    status_msg = await message.reply_text("🔎 Processing URL...", quote=True)
+    
+    # 1. Try Direct Link Generator
+    from bot.utils.direct_links import direct_link_generator
+    direct_link = direct_link_generator(text)
+    
+    if direct_link:
+        download_url = direct_link
+        await status_msg.edit_text(f"✅ Direct Link Detected!\n`{download_url}`\n\nStarting download...")
+    else:
+        # Fallback to authentic URL (maybe direct or yt-dlp supported)
+        download_url = text
+        await status_msg.edit_text("ℹ️ Standard URL detected. Attempting to download...")
+
+    # Download Logic
+    try:
+        user_dir = os.path.join(DOWNLOAD_DIR, str(user.id))
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Use generic downloader that supports progress
+        from bot.utils.helpers import download_http_file
+        
+        file_path = await download_http_file(download_url, user_dir, status_msg, user_id=user.id)
+        
+        if not file_path:
+             await status_msg.edit_text("❌ Failed to download file from URL.")
+             return
+        
+        # Prepare for processing
+        file_name = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path)
+        
+        user_data[user.id] = {
+            'message_id': message.id,
+            'file_name': file_name,
+            'file_size': file_size,
+            'file_path': file_path, # Local path now
+            'processing_file': file_path, # Set this too
+            'operation': None,
+            # Init settings if not present
+            'settings': user_data.get(user.id, {}).get('settings', {}),
+        }
+
+        info_text = (
+            f"<b>📁 File Downloaded!</b>\n\n"
+            f"<b>📄 Name:</b> <code>{file_name}</code>\n"
+            f"<b>💾 Size:</b> {get_readable_file_size(file_size)}\n\n"
+            f"<b>Select an operation from the menu below:</b>"
+        )
+        
+        await status_msg.edit_text(
+            info_text,
+            reply_markup=main_menu(user.id)
+        )
+
+    except Exception as e:
+        LOGGER.error(f"URL Download failed: {e}")
+        await status_msg.edit_text(f"❌ Error downloading URL: {str(e)}")
 
 
 async def download_file(message: Message, status_msg: Message, user_id: int = None) -> str:

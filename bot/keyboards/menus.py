@@ -414,6 +414,11 @@ def after_process_menu(user_id: int, file_size_mb: float, gdrive_enabled: bool =
     ])
     
     buttons.append([
+        InlineKeyboardButton("Rename File", callback_data=f"final_rename_{user_id}"),
+        InlineKeyboardButton("Zip & Upload", callback_data=f"final_zip_{user_id}"),
+    ])
+    
+    buttons.append([
         InlineKeyboardButton("Cancel & Delete", callback_data=f"cancel_upload_{user_id}"),
     ])
     
