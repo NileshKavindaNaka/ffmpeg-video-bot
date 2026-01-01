@@ -1,5 +1,5 @@
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InternalMouseButton
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bot.utils.db_handler import get_db
 
 async def open_settings(user_id: int):
