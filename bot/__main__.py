@@ -13,8 +13,8 @@ async def main():
     # Initialize database
     if MONGO_URI:
         try:
-            db_instance = Database(MONGO_URI, DATABASE_NAME)
-            await db_instance.connect()
+            from bot.utils.db_handler import init_database
+            await init_database(MONGO_URI, DATABASE_NAME)
             LOGGER.info("Connected to MongoDB successfully")
         except Exception as e:
             LOGGER.error(f"Failed to connect to MongoDB: {e}")
