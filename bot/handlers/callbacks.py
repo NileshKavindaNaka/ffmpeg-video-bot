@@ -145,19 +145,28 @@ async def subintro_callback(client: Client, query: CallbackQuery):
 @bot.on_callback_query(filters.regex(r"^back_"))
 async def back_callback(client: Client, query: CallbackQuery):
     """Handle Back button"""
-    # For main menu back, we just close or show nothing?
-    # Or maybe it was intended for something else.
-    # Let's map it to close for now or main menu reload.
-    await close_callback(client, query)
-    """Return to main menu"""
-    user_id = int(query.data.split("_")[1])
+    data = query.data
+    user_id = query.from_user.id
     
-    if query.from_user.id != user_id:
-        await query.answer("Not your button!", show_alert=True)
+    if data == "back_to_main_settings":
+        from bot.keyboards.settings_menu import open_settings
+        await query.message.edit_text("<b>⚙️ Settings Menu</b>", reply_markup=await open_settings(user_id))
+        await query.answer()
         return
-    
-    await query.message.edit_reply_markup(main_menu(user_id))
-    await query.answer()
+
+    # Handle generic back_{user_id}
+    try:
+        target_id = int(data.split("_")[1])
+        if user_id != target_id:
+            await query.answer("Not your button!", show_alert=True)
+            return
+        
+        from bot.keyboards.menus import main_menu
+        await query.message.edit_text("<b>Select an operation:</b>", reply_markup=main_menu(user_id))
+        await query.answer()
+    except ValueError:
+        # Fallback for complex back buttons
+        await query.answer("Back button error", show_alert=True)
 
 
 @bot.on_callback_query(filters.regex(r"^metadata_"))
@@ -1902,4 +1911,129 @@ async def del_thumb_callback(client: Client, query: CallbackQuery):
     await db.set_thumbnail(user_id, None)
     
     await query.message.edit_text("✅ <b>Thumbnail deleted!</b>")
+    await query.answer()
+
+# --- Missing Settings Handlers ---
+
+@bot.on_callback_query(filters.regex(r"^open_subtitle_settings$"))
+async def open_subtitle_settings_callback(client: Client, query: CallbackQuery):
+    """Open subtitle settings"""
+    from bot.keyboards.settings_menu import subtitle_settings_menu
+    await query.message.edit_text(
+        "<b>📜 Subtitle Settings</b>",
+        reply_markup=await subtitle_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^open_watermark_settings$"))
+async def open_watermark_settings_callback(client: Client, query: CallbackQuery):
+    """Open watermark settings"""
+    from bot.keyboards.settings_menu import watermark_settings_menu
+    await query.message.edit_text(
+        "<b>©️ Watermark Settings</b>",
+        reply_markup=await watermark_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^open_advanced_settings$"))
+async def open_advanced_settings_callback(client: Client, query: CallbackQuery):
+    """Open advanced settings"""
+    from bot.keyboards.settings_menu import advanced_settings_menu
+    await query.message.edit_text(
+        "<b>⚙️ Advanced Settings</b>",
+        reply_markup=await advanced_settings_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^toggle_softsubs$"))
+async def toggle_softsubs_callback(client: Client, query: CallbackQuery):
+    """Toggle softsubs"""
+    from bot.utils.db_handler import get_db
+    from bot.keyboards.settings_menu import subtitle_settings_menu
+    db = get_db()
+    user_id = query.from_user.id
+    
+    current = await db.get_subtitles(user_id)
+    await db.update_setting(user_id, 'subtitles', not current)
+    
+    await query.message.edit_reply_markup(reply_markup=await subtitle_settings_menu(user_id))
+    await query.answer(f"Softsubs {'Enabled' if not current else 'Disabled'}!")
+
+@bot.on_callback_query(filters.regex(r"^toggle_hardsubs$"))
+async def toggle_hardsubs_callback(client: Client, query: CallbackQuery):
+    """Toggle hardsubs"""
+    from bot.utils.db_handler import get_db
+    from bot.keyboards.settings_menu import subtitle_settings_menu
+    db = get_db()
+    user_id = query.from_user.id
+    
+    current = await db.get_hardsub(user_id)
+    await db.update_setting(user_id, 'hardsub', not current)
+    
+    await query.message.edit_reply_markup(reply_markup=await subtitle_settings_menu(user_id))
+    await query.answer(f"Hardsubs {'Enabled' if not current else 'Disabled'}!")
+
+@bot.on_callback_query(filters.regex(r"^toggle_watermark$"))
+async def toggle_watermark_callback(client: Client, query: CallbackQuery):
+    """Toggle watermark"""
+    from bot.utils.db_handler import get_db
+    from bot.keyboards.settings_menu import watermark_settings_menu
+    db = get_db()
+    user_id = query.from_user.id
+    
+    current = await db.get_watermark(user_id)
+    await db.update_setting(user_id, 'watermark_enabled', not current)
+    
+    await query.message.edit_reply_markup(reply_markup=await watermark_settings_menu(user_id))
+    await query.answer(f"Watermark {'Enabled' if not current else 'Disabled'}!")
+
+@bot.on_callback_query(filters.regex(r"^wm_pos_menu$"))
+async def wm_pos_menu_callback(client: Client, query: CallbackQuery):
+    """Show watermark position menu (Fixed)"""
+    from bot.keyboards.menus import watermark_position_menu
+    await query.message.edit_text(
+        "<b>📍 Select Watermark Position</b>",
+        reply_markup=watermark_position_menu(query.from_user.id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^reset_settings_confirm$"))
+async def reset_settings_confirm_callback(client: Client, query: CallbackQuery):
+    """Reset all settings"""
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    user_id = query.from_user.id
+    
+    await db.delete_user(user_id)
+    await db.add_user(user_id, query.from_user.username, query.from_user.first_name) # Re-add with defaults
+    
+    from bot.keyboards.settings_menu import open_settings
+    await query.message.edit_text(
+        "✅ <b>All Settings Reset!</b>",
+        reply_markup=await open_settings(user_id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^set_audio_codec_menu$"))
+async def set_audio_codec_menu_callback(client: Client, query: CallbackQuery):
+    """Audio Codec Menu"""
+    # Just simple prompt for now or menu
+    user_id = query.from_user.id
+    user_data[user_id]['waiting_for'] = 'enc_acodec'
+    await query.message.edit_text(
+        "<b>🔊 Set Audio Codec</b>\nSend codec name (e.g. <code>aac</code>, <code>libmp3lame</code>)",
+        reply_markup=close_button(user_id)
+    )
+    await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^set_channels_menu$"))
+async def set_channels_menu_callback(client: Client, query: CallbackQuery):
+    """Audio Channels Menu"""
+    # Simple prompt
+    user_id = query.from_user.id
+    user_data[user_id]['waiting_for'] = 'enc_channels'
+    await query.message.edit_text(
+        "<b>🔊 Set Audio Channels</b>\nSend number (e.g. <code>2.0</code>, <code>5.1</code>)",
+        reply_markup=close_button(user_id)
+    )
     await query.answer()

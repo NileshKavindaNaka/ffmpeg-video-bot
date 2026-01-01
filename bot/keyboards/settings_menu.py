@@ -85,3 +85,36 @@ async def audio_settings_menu(user_id: int):
     ]
     return InlineKeyboardMarkup(buttons)
 
+
+async def subtitle_settings_menu(user_id: int):
+    """Subtitle settings menu"""
+    db = get_db()
+    soft = await db.get_subtitles(user_id)
+    hard = await db.get_hardsub(user_id)
+    
+    buttons = [
+        [InlineKeyboardButton(f"Softsubs (Mux): {'✅' if soft else '❌'}", callback_data="toggle_softsubs")],
+        [InlineKeyboardButton(f"Hardsubs (Burn): {'✅' if hard else '❌'}", callback_data="toggle_hardsubs")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_to_main_settings")]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+async def watermark_settings_menu(user_id: int):
+    """Watermark settings menu"""
+    db = get_db()
+    enabled = await db.get_watermark(user_id)
+    
+    buttons = [
+        [InlineKeyboardButton(f"Watermark: {'✅' if enabled else '❌'}", callback_data="toggle_watermark")],
+        [InlineKeyboardButton("Pos: Bottom Right", callback_data="wm_pos_menu")], # Placeholder for now
+        [InlineKeyboardButton("🔙 Back", callback_data="back_to_main_settings")]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+async def advanced_settings_menu(user_id: int):
+    """Advanced settings menu"""
+    buttons = [
+        [InlineKeyboardButton("Reset All Settings", callback_data="reset_settings_confirm")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_to_main_settings")]
+    ]
+    return InlineKeyboardMarkup(buttons)
