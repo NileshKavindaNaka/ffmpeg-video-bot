@@ -64,7 +64,8 @@ async def convert_format(
     input_file: str,
     output_format: str,
     output: str = None,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Convert video to different container format"""
     
@@ -102,20 +103,7 @@ async def convert_format(
     
     cmd.append(output)
     
-    success, result = await run_ffmpeg_command(cmd, progress_callback) # duration optional/unknown?
-    # actually we should accept duration if we want percentage.
-    # But convert_format signature in step 820 says: progress_callback: Callable = None
-    # I should add duration to signature if I want percentage.
-    # I'll stick to run_ffmpeg_command without duration arg here if I don't update signature, 
-    # BUT run_ffmpeg_command signature is (cmd, cb, duration). 
-    # So I MUST pass duration. Default is None. 
-    # IF I don't pass duration, percentage won't be calculated?
-    # run_ffmpeg_command logic: if progress_callback and duration: await cb(current_time)
-    # wait, cb expects TIME? 
-    # FFmpegProgress.update() uses time.
-    # So duration is NOT needed for the callback execution itself? 
-    # But core.py check: "if progress_callback and duration:".
-    # So duration IS required for callback to fire.
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
     
     return success, result if not success else output
 

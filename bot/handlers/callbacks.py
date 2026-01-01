@@ -1343,7 +1343,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
 
         elif operation == 'watermark':
             # Text or Image?
-            wm_text = options.get('text')
+            wm_text = options.pop('text', None)  # Use pop to remove from options
             if wm_text:
                 success, result = await add_text_watermark(input_path, wm_text, output_path, progress_callback=progress.update, duration=duration, **options)
             else:
