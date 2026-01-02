@@ -20,7 +20,7 @@ async def main():
             LOGGER.error(f"Failed to connect to MongoDB: {e}")
     
     # Import handlers
-    from bot.handlers import commands, callbacks, file_handler
+    from bot.handlers import commands, callbacks, file_handler, message_handler
     
     # Start the bot
     await bot.start()
