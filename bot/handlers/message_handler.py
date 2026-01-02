@@ -19,13 +19,15 @@ async def handle_text_input(client: Client, message: Message):
     # LOGGER.info(f"Received text from {user_id}: {message.text}")
     
     if user_id not in user_data:
-        # If user sends text but has no session, ignore or maybe reply?
-        # For now, silently ignore as it might be random chat
+        # Debugging: Reply to user
+        await message.reply_text(f"DEBUG: No active session found for user {user_id}. Please click the button again.")
         return
         
     waiting_for = user_data[user_id].get('waiting_for')
     
     if not waiting_for:
+        # Debugging: Reply to user
+        await message.reply_text(f"DEBUG: Not waiting for any input. Current state: {user_data[user_id]}")
         return
         
     text = message.text
