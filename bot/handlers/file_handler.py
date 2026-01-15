@@ -404,7 +404,6 @@ async def handle_url_logic(client, message, text):
                     "⚠️ Direct download failed.\n"
                     "Trying <code>yt-dlp</code> as a fallback..."
                 )
-                import asyncio
                 import glob
                 # Use yt-dlp to download best video to user_dir
                 out_tpl = os.path.join(user_dir, "%(title)s.%(ext)s")
