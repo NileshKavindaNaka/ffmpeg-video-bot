@@ -18,21 +18,31 @@ async def get_cookies_path(user_id: int = None) -> Optional[str]:
     from bot.utils.db_handler import get_db
     db = get_db()
     if not db:
+        LOGGER.warning("Database not available for cookies")
         return None
     
     try:
         # Try user-specific cookies first, then global
-        cookies_data = await db.get_cookies(user_id) if user_id else None
-        if not cookies_data:
-            cookies_data = await db.get_cookies(0)  # Global cookies (user_id=0)
+        cookies_data = None
+        if user_id:
+            cookies_data = await db.get_cookies(user_id)
+            if cookies_data:
+                LOGGER.info(f"Found user-specific cookies for {user_id}")
         
         if not cookies_data:
+            cookies_data = await db.get_cookies(0)  # Global cookies (user_id=0)
+            if cookies_data:
+                LOGGER.info("Found global cookies")
+        
+        if not cookies_data:
+            LOGGER.info("No cookies found in database")
             return None
         
         # Write to temp file
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
         temp_file.write(cookies_data)
         temp_file.close()
+        LOGGER.info(f"Cookies written to temp file: {temp_file.name}")
         return temp_file.name
     except Exception as e:
         LOGGER.error(f"Error getting cookies: {e}")

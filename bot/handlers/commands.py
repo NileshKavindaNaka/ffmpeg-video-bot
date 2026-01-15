@@ -796,8 +796,24 @@ async def cookies_command(client: Client, message: Message):
         await db.delete_cookies(0)
         await message.reply_text("✅ <b>Cookies deleted successfully.</b>")
     
+    elif action == "test":
+        # Test if cookies are accessible
+        cookies_data = await db.get_cookies(0)
+        if cookies_data:
+            lines = cookies_data.split('\n')
+            youtube_lines = [l for l in lines if 'youtube' in l.lower() or 'google' in l.lower()]
+            await message.reply_text(
+                f"✅ <b>Cookies found in database!</b>\n\n"
+                f"<b>Total lines:</b> {len(lines)}\n"
+                f"<b>YouTube/Google entries:</b> {len(youtube_lines)}\n\n"
+                f"<b>First few YouTube entries:</b>\n"
+                f"<code>{chr(10).join(youtube_lines[:5])[:500]}</code>"
+            )
+        else:
+            await message.reply_text("❌ No cookies found in database.")
+    
     else:
-        await message.reply_text("❌ Unknown action. Use <code>/cookies set</code> or <code>/cookies clear</code>")
+        await message.reply_text("❌ Unknown action. Use <code>/cookies set</code>, <code>/cookies test</code>, or <code>/cookies clear</code>")
 
 
 @bot.on_message(filters.document & filters.private)
