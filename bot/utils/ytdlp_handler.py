@@ -57,16 +57,15 @@ async def download_with_ytdlp(
     # Prepare output template
     out_tpl = os.path.join(output_dir, "%(title)s.%(ext)s")
     
-    # Build command
+    # Build command with simpler, more compatible options
     cmd = ["yt-dlp", "-o", out_tpl]
     
-    # Add format selection (best video+audio merged)
+    # Add format selection - use simpler "best" for better compatibility
     if format_id:
         cmd.extend(["-f", format_id])
     else:
-        # Default: best video+audio, prefer mp4
-        cmd.extend(["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"])
-        cmd.extend(["--merge-output-format", "mp4"])
+        # Simpler format selection that works better with age-restricted/geo-blocked
+        cmd.extend(["-f", "best"])
     
     # Add cookies if available
     cookies_path = await get_cookies_path(user_id)
@@ -76,18 +75,22 @@ async def download_with_ytdlp(
     
     # Add other useful options
     cmd.extend([
-        "--no-playlist",  # Download single video, not playlist
+        "--no-playlist",      # Download single video
         "--no-warnings",
-        "--progress",
-        "--newline",
+        "--no-check-certificates",  # Bypass SSL issues
+        "--extractor-retries", "3",  # Retry failed extractions
+        "--retries", "3",     # Retry failed downloads
+        "--fragment-retries", "3",
         url
     ])
     
     try:
         if status_msg:
+            cookie_status = "🍪" if cookies_path else "⚠️ No cookies"
             await status_msg.edit_text(
-                "🎬 <b>Downloading with yt-dlp...</b>\n"
-                f"<code>{url[:50]}...</code>"
+                f"🎬 <b>Downloading with yt-dlp...</b>\n"
+                f"<code>{url[:50]}...</code>\n\n"
+                f"{cookie_status}"
             )
         
         # Run yt-dlp
@@ -106,19 +109,25 @@ async def download_with_ytdlp(
             except:
                 pass
         
+        # Get combined output for error checking
+        output_text = stdout.decode('utf-8', errors='ignore') + stderr.decode('utf-8', errors='ignore')
+        
         if proc.returncode == 0:
             # Find the downloaded file (newest file in output_dir)
             candidates = glob.glob(os.path.join(output_dir, "*"))
             if candidates:
                 file_path = max(candidates, key=os.path.getmtime)
-                return True, file_path
+                # Check if file is not empty
+                if os.path.getsize(file_path) > 0:
+                    return True, file_path
+                else:
+                    os.remove(file_path)
+                    return False, "⚠️ Downloaded file is empty. YouTube may require cookies.\n\nUse /cookies set to upload your cookies.txt file."
             else:
                 return False, "Download completed but file not found"
         else:
             # Parse error message
-            error_msg = stderr.decode('utf-8', errors='ignore').strip()
-            if not error_msg:
-                error_msg = stdout.decode('utf-8', errors='ignore').strip()
+            error_msg = output_text.strip()
             
             # Extract meaningful error
             if "Sign in to confirm your age" in error_msg:
@@ -133,9 +142,15 @@ async def download_with_ytdlp(
                 return False, "⚠️ Too many requests. Please try again later."
             elif "Unsupported URL" in error_msg:
                 return False, "⚠️ This URL is not supported by yt-dlp."
+            elif "downloaded file is empty" in error_msg.lower() or "file is empty" in error_msg.lower():
+                return False, "⚠️ YouTube blocked the download. Please upload cookies using /cookies command.\n\n<b>How to get cookies:</b>\n1. Install 'Get cookies.txt' extension in Chrome\n2. Go to YouTube and login\n3. Export cookies and upload with /cookies set"
+            elif "no video formats" in error_msg.lower():
+                return False, "⚠️ No downloadable formats found. The video may be protected or region-locked."
             else:
                 # Return last few lines of error
                 error_lines = error_msg.split('\n')
+                # Filter out empty lines
+                error_lines = [l for l in error_lines if l.strip()]
                 short_error = '\n'.join(error_lines[-3:]) if len(error_lines) > 3 else error_msg
                 return False, f"❌ yt-dlp error:\n<code>{short_error[:500]}</code>"
                 
