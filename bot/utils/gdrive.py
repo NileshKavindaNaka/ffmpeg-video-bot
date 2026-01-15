@@ -35,14 +35,51 @@ class GoogleDrive:
     def initialize(self) -> bool:
         """Initialize the Drive service"""
         try:
-            if not os.path.exists(self.credentials_file):
-                LOGGER.warning(f"Credentials file not found: {self.credentials_file}")
+            credentials = None
+            
+            # First, try file-based credentials
+            if os.path.exists(self.credentials_file):
+                credentials = service_account.Credentials.from_service_account_file(
+                    self.credentials_file,
+                    scopes=SCOPES
+                )
+                LOGGER.info("Using credentials from file")
+            else:
+                # Try to load from MongoDB
+                try:
+                    from bot.utils.db_handler import get_db
+                    import json
+                    import tempfile
+                    
+                    db = get_db()
+                    if db:
+                        # Run async in sync context
+                        import asyncio
+                        loop = asyncio.get_event_loop()
+                        creds_data = loop.run_until_complete(db.get_gdrive_credentials())
+                        
+                        if creds_data:
+                            # Write to temp file for the Google library
+                            creds_json = json.loads(creds_data)
+                            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+                            json.dump(creds_json, temp_file)
+                            temp_file.close()
+                            
+                            credentials = service_account.Credentials.from_service_account_file(
+                                temp_file.name,
+                                scopes=SCOPES
+                            )
+                            
+                            # Cleanup temp file
+                            os.remove(temp_file.name)
+                            LOGGER.info("Using credentials from MongoDB")
+                except Exception as e:
+                    LOGGER.warning(f"Could not load credentials from MongoDB: {e}")
+            
+            if not credentials:
+                LOGGER.warning(f"No GDrive credentials found")
                 return False
             
-            credentials = service_account.Credentials.from_service_account_file(
-                self.credentials_file,
-                scopes=SCOPES
-            )
             self.service = build('drive', 'v3', credentials=credentials)
             self._initialized = True
             LOGGER.info("Google Drive service initialized")

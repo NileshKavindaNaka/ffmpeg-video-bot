@@ -356,34 +356,22 @@ async def handle_url_logic(client, message, text):
         
         # Check if URL is from a video platform that requires yt-dlp
         video_platforms = ['youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com', 
-                           'twitch.tv', 'twitter.com', 'x.com', 'facebook.com', 'instagram.com']
+                           'twitch.tv', 'twitter.com', 'x.com', 'facebook.com', 'instagram.com',
+                           'tiktok.com', 'reddit.com', 'bilibili.com']
         is_video_platform = any(platform in url.lower() for platform in video_platforms)
         
         if is_video_platform:
-            # Use yt-dlp directly for video platforms
+            # Use yt-dlp handler for video platforms
             from bot import ENABLE_YTDLP
             if ENABLE_YTDLP:
-                await status_msg.edit_text(
-                    "🎬 <b>Video platform detected!</b>\n"
-                    "Downloading with <code>yt-dlp</code>..."
+                from bot.utils.ytdlp_handler import download_with_ytdlp
+                success, result = await download_with_ytdlp(
+                    url, user_dir, user_id=user.id, status_msg=status_msg
                 )
-                import glob
-                out_tpl = os.path.join(user_dir, "%(title)s.%(ext)s")
-                proc = await asyncio.create_subprocess_exec(
-                    "yt-dlp",
-                    "-o",
-                    out_tpl,
-                    url,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                await proc.wait()
-                if proc.returncode == 0:
-                    candidates = glob.glob(os.path.join(user_dir, "*"))
-                    if candidates:
-                        file_path = max(candidates, key=os.path.getmtime)
-                if not file_path:
-                    await status_msg.edit_text("❌ Failed to download video. Make sure the URL is valid.")
+                if success:
+                    file_path = result
+                else:
+                    await status_msg.edit_text(result)  # Error message
                     return
             else:
                 await status_msg.edit_text(
@@ -404,25 +392,14 @@ async def handle_url_logic(client, message, text):
                     "⚠️ Direct download failed.\n"
                     "Trying <code>yt-dlp</code> as a fallback..."
                 )
-                import glob
-                # Use yt-dlp to download best video to user_dir
-                out_tpl = os.path.join(user_dir, "%(title)s.%(ext)s")
-                proc = await asyncio.create_subprocess_exec(
-                    "yt-dlp",
-                    "-o",
-                    out_tpl,
-                    url,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
+                from bot.utils.ytdlp_handler import download_with_ytdlp
+                success, result = await download_with_ytdlp(
+                    url, user_dir, user_id=user.id, status_msg=status_msg
                 )
-                await proc.wait()
-                if proc.returncode == 0:
-                    # Pick the newest file in user_dir as the downloaded file
-                    candidates = glob.glob(os.path.join(user_dir, "*"))
-                    if candidates:
-                        file_path = max(candidates, key=os.path.getmtime)
-                if not file_path:
-                    await status_msg.edit_text("❌ Failed to download file from URL.")
+                if success:
+                    file_path = result
+                else:
+                    await status_msg.edit_text(result)
                     return
             else:
                 await status_msg.edit_text("❌ Failed to download file from URL.")

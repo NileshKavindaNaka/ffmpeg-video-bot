@@ -745,3 +745,213 @@ async def queue_command(client: Client, message: Message):
         await message.reply_text(text, reply_markup=close_button(user.id))
 
 
+# ─────────────────────────────────────────────────────────────
+# Cookie Management Commands
+# ─────────────────────────────────────────────────────────────
+@bot.on_message(filters.command("cookies") & filters.private)
+async def cookies_command(client: Client, message: Message):
+    """Handle /cookies command - Manage yt-dlp cookies"""
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ This command is owner-only.")
+        return
+    
+    db = get_db()
+    if not db:
+        await message.reply_text("❌ Database not connected.")
+        return
+    
+    args = message.text.split()
+    
+    if len(args) == 1:
+        # Show status
+        has_global = await db.has_cookies(0)
+        status = "✅ Cookies are set" if has_global else "❌ No cookies set"
+        
+        await message.reply_text(
+            f"<b>🍪 YT-DLP Cookies Status</b>\n\n"
+            f"{status}\n\n"
+            f"<b>Commands:</b>\n"
+            f"• <code>/cookies set</code> - Upload cookies.txt file\n"
+            f"• <code>/cookies clear</code> - Delete stored cookies\n\n"
+            f"<b>How to get cookies:</b>\n"
+            f"1. Install 'Get cookies.txt' browser extension\n"
+            f"2. Log in to YouTube\n"
+            f"3. Export cookies as cookies.txt\n"
+            f"4. Upload here with <code>/cookies set</code>"
+        )
+        return
+    
+    action = args[1].lower()
+    
+    if action == "set":
+        user_data[message.from_user.id] = user_data.get(message.from_user.id, {})
+        user_data[message.from_user.id]['waiting_for'] = 'cookies_file'
+        await message.reply_text(
+            "📤 <b>Upload your cookies.txt file now.</b>\n\n"
+            "The file should be in Netscape cookie format.\n"
+            "Send /cancel to abort."
+        )
+    
+    elif action == "clear":
+        await db.delete_cookies(0)
+        await message.reply_text("✅ <b>Cookies deleted successfully.</b>")
+    
+    else:
+        await message.reply_text("❌ Unknown action. Use <code>/cookies set</code> or <code>/cookies clear</code>")
+
+
+@bot.on_message(filters.document & filters.private)
+async def handle_document_upload(client: Client, message: Message):
+    """Handle document uploads for cookies and credentials"""
+    user = message.from_user
+    
+    if user.id not in user_data:
+        return
+    
+    waiting_for = user_data[user.id].get('waiting_for')
+    
+    if waiting_for == 'cookies_file':
+        # Handle cookies.txt upload
+        user_data[user.id]['waiting_for'] = None
+        
+        doc = message.document
+        if doc.file_size > 1024 * 1024:  # 1MB limit
+            await message.reply_text("❌ File too large. Cookies file should be under 1MB.")
+            return
+        
+        status_msg = await message.reply_text("⏳ Processing cookies file...")
+        
+        try:
+            # Download file
+            file_path = await message.download()
+            
+            # Read content
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                cookies_data = f.read()
+            
+            # Validate it looks like a cookies file
+            if not ('# Netscape HTTP Cookie' in cookies_data or '.youtube.com' in cookies_data or 'TRUE' in cookies_data):
+                await status_msg.edit_text("❌ This doesn't look like a valid cookies.txt file.")
+                os.remove(file_path)
+                return
+            
+            # Store in database
+            db = get_db()
+            await db.set_cookies(cookies_data, 0)  # Global cookies
+            
+            # Cleanup
+            os.remove(file_path)
+            
+            await status_msg.edit_text(
+                "✅ <b>Cookies saved successfully!</b>\n\n"
+                "YouTube downloads should now work better."
+            )
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Error: {e}")
+    
+    elif waiting_for == 'gdrive_credentials':
+        # Handle credentials.json upload
+        user_data[user.id]['waiting_for'] = None
+        
+        doc = message.document
+        if not doc.file_name.endswith('.json'):
+            await message.reply_text("❌ Please upload a .json file.")
+            return
+        
+        if doc.file_size > 100 * 1024:  # 100KB limit
+            await message.reply_text("❌ File too large for credentials.")
+            return
+        
+        status_msg = await message.reply_text("⏳ Processing credentials...")
+        
+        try:
+            file_path = await message.download()
+            
+            with open(file_path, 'r') as f:
+                creds_data = f.read()
+            
+            # Basic validation
+            import json
+            creds_json = json.loads(creds_data)
+            if 'type' not in creds_json or creds_json.get('type') != 'service_account':
+                await status_msg.edit_text("❌ Invalid credentials. Must be a Google Service Account JSON.")
+                os.remove(file_path)
+                return
+            
+            # Store in database
+            db = get_db()
+            await db.set_gdrive_credentials(creds_data)
+            
+            os.remove(file_path)
+            
+            await status_msg.edit_text(
+                "✅ <b>Google Drive credentials saved!</b>\n\n"
+                "Make sure to share your GDrive folder with:\n"
+                f"<code>{creds_json.get('client_email', 'the service account email')}</code>"
+            )
+        except json.JSONDecodeError:
+            await status_msg.edit_text("❌ Invalid JSON file.")
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Error: {e}")
+
+
+# ─────────────────────────────────────────────────────────────
+# Google Drive Credentials Command
+# ─────────────────────────────────────────────────────────────
+@bot.on_message(filters.command("gdrive") & filters.private)
+async def gdrive_command(client: Client, message: Message):
+    """Handle /gdrive command - Manage Google Drive credentials"""
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ This command is owner-only.")
+        return
+    
+    db = get_db()
+    if not db:
+        await message.reply_text("❌ Database not connected.")
+        return
+    
+    args = message.text.split()
+    
+    if len(args) == 1:
+        # Show status
+        has_creds = await db.has_gdrive_credentials()
+        from bot import GDRIVE_ENABLED, GDRIVE_FOLDER_ID
+        
+        status = "✅ Credentials set" if has_creds else "❌ No credentials"
+        enabled = "✅ Enabled" if GDRIVE_ENABLED else "❌ Disabled"
+        folder = f"<code>{GDRIVE_FOLDER_ID}</code>" if GDRIVE_FOLDER_ID else "❌ Not set"
+        
+        await message.reply_text(
+            f"<b>☁️ Google Drive Status</b>\n\n"
+            f"<b>GDrive Upload:</b> {enabled}\n"
+            f"<b>Credentials:</b> {status}\n"
+            f"<b>Folder ID:</b> {folder}\n\n"
+            f"<b>Commands:</b>\n"
+            f"• <code>/gdrive set</code> - Upload credentials.json\n"
+            f"• <code>/gdrive clear</code> - Delete credentials\n\n"
+            f"<b>Setup:</b>\n"
+            f"1. Create a Google Cloud project\n"
+            f"2. Enable Google Drive API\n"
+            f"3. Create a Service Account\n"
+            f"4. Download credentials.json\n"
+            f"5. Upload with <code>/gdrive set</code>"
+        )
+        return
+    
+    action = args[1].lower()
+    
+    if action == "set":
+        user_data[message.from_user.id] = user_data.get(message.from_user.id, {})
+        user_data[message.from_user.id]['waiting_for'] = 'gdrive_credentials'
+        await message.reply_text(
+            "📤 <b>Upload your credentials.json file now.</b>\n\n"
+            "This should be a Google Service Account JSON file.\n"
+            "Send /cancel to abort."
+        )
+    
+    elif action == "clear":
+        await db.delete_gdrive_credentials()
+        await message.reply_text("✅ <b>Google Drive credentials deleted.</b>")
+    
+    else:
+        await message.reply_text("❌ Unknown action. Use <code>/gdrive set</code> or <code>/gdrive clear</code>")

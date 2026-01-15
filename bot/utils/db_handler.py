@@ -174,6 +174,73 @@ class Database:
             {"$set": {"thumbnail": file_id}}
         )
 
+    # ─────────────────────────────────────────────────────────────
+    # Cookies Storage (for yt-dlp)
+    # ─────────────────────────────────────────────────────────────
+    async def get_cookies(self, user_id: int = 0) -> str:
+        """Get cookies data. user_id=0 for global cookies."""
+        doc = await self._settings.find_one({"_id": f"cookies_{user_id}"})
+        return doc.get("data") if doc else None
+
+    async def set_cookies(self, cookies_data: str, user_id: int = 0):
+        """Store cookies data. user_id=0 for global cookies."""
+        await self._settings.update_one(
+            {"_id": f"cookies_{user_id}"},
+            {"$set": {"data": cookies_data}},
+            upsert=True
+        )
+
+    async def delete_cookies(self, user_id: int = 0):
+        """Delete cookies. user_id=0 for global cookies."""
+        await self._settings.delete_one({"_id": f"cookies_{user_id}"})
+
+    async def has_cookies(self, user_id: int = 0) -> bool:
+        """Check if cookies exist."""
+        doc = await self._settings.find_one({"_id": f"cookies_{user_id}"})
+        return doc is not None
+
+    # ─────────────────────────────────────────────────────────────
+    # Google Drive Credentials Storage
+    # ─────────────────────────────────────────────────────────────
+    async def get_gdrive_credentials(self) -> str:
+        """Get GDrive credentials JSON string."""
+        doc = await self._settings.find_one({"_id": "gdrive_credentials"})
+        return doc.get("data") if doc else None
+
+    async def set_gdrive_credentials(self, credentials_json: str):
+        """Store GDrive credentials JSON string."""
+        await self._settings.update_one(
+            {"_id": "gdrive_credentials"},
+            {"$set": {"data": credentials_json}},
+            upsert=True
+        )
+
+    async def delete_gdrive_credentials(self):
+        """Delete GDrive credentials."""
+        await self._settings.delete_one({"_id": "gdrive_credentials"})
+
+    async def has_gdrive_credentials(self) -> bool:
+        """Check if GDrive credentials exist."""
+        doc = await self._settings.find_one({"_id": "gdrive_credentials"})
+        return doc is not None
+
+    # ─────────────────────────────────────────────────────────────
+    # Bot Config Storage (for dynamic settings)
+    # ─────────────────────────────────────────────────────────────
+    async def get_bot_config(self, key: str, default=None):
+        """Get a bot config value."""
+        doc = await self._settings.find_one({"_id": f"config_{key}"})
+        return doc.get("value", default) if doc else default
+
+    async def set_bot_config(self, key: str, value):
+        """Set a bot config value."""
+        await self._settings.update_one(
+            {"_id": f"config_{key}"},
+            {"$set": {"value": value}},
+            upsert=True
+        )
+
+
 # Global database instance
 db_instance: Database = None
 
@@ -183,13 +250,6 @@ async def init_database(uri: str, database_name: str) -> Database:
     db_instance = Database(uri, database_name)
     await db_instance.connect()
     return db_instance
-
-    # Log Channel (Global Setting or Per User?)
-    # Reference bot has a global log channel defined in config, but maybe we can store per-user logs?
-    # For now, let's keep it simple as per reference bot (Config based usually, but here we can add if needed)
-    # Actually, reference bot often uses a LOG_CHANNEL var.
-    # We will assume LOG_CHANNEL is in config.env, but if we want to store *last* log, we can.
-    # Let's just stick to thumbnail for DB.
 
 def get_db() -> Database:
     """Get database instance"""
