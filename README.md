@@ -1,4 +1,4 @@
-# FFmpeg Processor Bot V2.0.0 🚀
+# FFmpeg Processor Bot V2.1.0 🚀
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
 
@@ -35,6 +35,16 @@ A powerful Telegram bot for video processing using FFmpeg. Deploy on your VPS or
 - Thumbnail extraction
 - Audio extraction (MP3, AAC, FLAC, etc.)
 - **Google Drive upload** (for files >2GB)
+
+### 🆕 New in v2.1.0
+| Feature | Description |
+|---------|-------------|
+| **YT-DLP Support** | Download from YouTube, Vimeo, Twitter, and 1000+ sites |
+| **Encoding Profiles** | Quick presets: High Quality, Balanced, Small Size |
+| **Task Queuing** | Queue multiple tasks per user (configurable limit) |
+| **Authorized Groups** | Restrict bot to specific Telegram groups |
+| **Persistent Settings** | User preferences saved to MongoDB |
+| **Upload Preferences** | Toggle default upload destination (Telegram/GDrive) |
 
 ## Requirements
 
@@ -121,6 +131,10 @@ python3 -m bot
 | `API_HASH` | ✅ | Telegram API Hash from my.telegram.org |
 | `MONGO_URI` | ❌ | MongoDB connection string |
 | `AUTHORIZED_USERS` | ❌ | Comma-separated user IDs (empty = public) |
+| `AUTHORIZED_GROUPS` | ❌ | Comma-separated group IDs (empty = all groups) |
+| `ENABLE_YTDLP` | ❌ | Enable YT-DLP for video platforms (True/False) |
+| `MAX_QUEUE_PER_USER` | ❌ | Max pending tasks per user (default: 3) |
+| `LOG_CHANNEL` | ❌ | Channel ID to forward processed files (0 = off) |
 | `MAX_FILE_SIZE` | ❌ | Maximum download size in MB (default: 2000) |
 | `TG_MAX_FILE_SIZE` | ❌ | Max file size for TG upload (default: 2000) |
 | `MAX_DURATION` | ❌ | Max video duration in seconds (default: 7200) |
